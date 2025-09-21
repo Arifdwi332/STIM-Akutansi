@@ -292,7 +292,7 @@
                             <input type="text" class="form-control" id="bb-total" value="Rp. 0" readonly>
                         </div>
                         <div class="text-right">
-                            <button class="btn btn-primary">Simpan</button>
+                            <button class="btn btn-primary" id="btnSimpanSaldoAwal">Simpan</button>
                         </div>
                     </div>
                 </div>
@@ -306,20 +306,30 @@
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label>Tipe Transaksi</label>
-                                <select class="custom-select">
-                                    <option>Pembelian</option>
-                                    <option>Penjualan</option>
+                                <select id="tipe_transaksi" class="custom-select">
+                                    <option value="Pembelian">Pembelian</option>
+                                    <option value="Penjualan">Penjualan</option>
+                                    <option value="Manual">Manual</option>
                                 </select>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-6">
                                 <label>Nominal</label>
-                                <input type="text" class="form-control" placeholder="Rp. xx,xxx,xxx">
+                                <input type="text" class="form-control" id="trx_nominal" placeholder="Rp. xx,xxx,xxx">
                             </div>
-                            <div class="form-group col-md-3">
-                                <label>Tipe Bayar</label>
-                                <select class="custom-select">
-                                    <option>Tunai</option>
-                                    <option>Non Tunai</option>
+                        </div>
+
+                        <!-- Akun Debet/Kredit: hanya tampil untuk 'Manual' -->
+                        <div id="rowManualAccounts" class="form-row" style="display:none;">
+                            <div class="form-group col-md-6">
+                                <label>Akun Debet</label>
+                                <select id="akun_debet_id" class="form-control">
+                                    <option value="" disabled selected>Pilih Akun Debet</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label>Akun Kredit</label>
+                                <select id="akun_kredit_id" class="form-control">
+                                    <option value="" disabled selected>Pilih Akun Kredit</option>
                                 </select>
                             </div>
                         </div>
@@ -328,7 +338,8 @@
                             <div class="form-group col-md-6">
                                 <label>Tanggal</label>
                                 <div class="input-group">
-                                    <input type="date" class="form-control" placeholder="xx/xx/xxxx">
+                                    <input type="date" class="form-control" id="trx_tanggal"
+                                        placeholder="xx/xx/xxxx">
                                 </div>
                             </div>
                             <div class="form-group col-md-6">
@@ -338,11 +349,12 @@
                         </div>
 
                         <div class="text-right">
-                            <button class="btn btn-primary">Simpan</button>
+                            <button class="btn btn-primary" id="btnSimpanTransaksi">Simpan</button>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
 
         {{-- ===== Tabel bawah ===== --}}
@@ -463,7 +475,6 @@
     </div>
 </div>
 
-{{-- ===== JS Dinamis: pasangan Sub Akun <-> Nominal ===== --}}
 @push('scripts')
     <script>
         (function() {
@@ -509,7 +520,6 @@
             }
 
 
-            // Tambah pasangan
             $btnAdd.on('click', function() {
                 const $row = buildPair();
                 const disabled = $pairs.find('.sub-akun-select').first().prop('disabled');
@@ -517,16 +527,13 @@
                 $pairs.append($row);
             });
 
-            // Hapus 1 pasangan
             $pairs.on('click', '.remove-pair', function() {
                 $(this).closest('.bb-pair').remove();
                 recompute();
             });
 
-            // Hitung total saat nominal diketik
             $pairs.on('input', '.bb-nominal', recompute);
 
-            // ===== Load master akun (Kode Akun) =====
             $.get('/buku_besar/mst_akun', function(res) {
                 if (!res || !res.ok) return;
                 res.data.forEach(it => {
@@ -540,12 +547,10 @@
                 });
             });
 
-            // ===== Saat Kode Akun dipilih: set nama & muat sub akun =====
             $('#kode_akun_id').on('change', function() {
                 const nama = $(this).find('option:selected').data('nama') || '';
                 $nama.val(nama);
 
-                // tampilkan loading di semua dropdown sub
                 $pairs.find('.sub-akun-select').prop('disabled', true)
                     .html('<option value="" disabled selected>Memuat...</option>');
 
@@ -576,7 +581,6 @@
                     });
             });
 
-            // init total
             recompute();
         })();
     </script>
@@ -584,13 +588,11 @@
 
     <script>
         $(function() {
-            // Buka modal akun baru (jika ada tombol pembuka di tempat lain)
             $('#btnAkunBaruOpen').on('click', function() {
                 $('#formAkunBaru')[0].reset();
                 $('#modalAkunBaru').modal('show');
             });
 
-            // Submit akun baru
             $('#formAkunBaru').on('submit', function(e) {
                 e.preventDefault();
                 const $btn = $('#btnSimpanAkunBaru').prop('disabled', true).text('Menyimpan...');
@@ -603,7 +605,6 @@
                     })
                     .done(function(res) {
                         if (res && res.ok) {
-                            // inject ke select pertama (sesuaikan target select spesifik bila perlu)
                             const $select = $('select.form-control').first();
                             if ($select.length) {
                                 const text = res.data.nama_akun + ' (' + res.data.kode_akun + ')';
@@ -632,22 +633,18 @@
     </script>
     <script>
         (function() {
-            // submit saldo awal
-            $(document).on('click', '.bb-panel .btn.btn-primary:contains("Simpan")', function(e) {
+            $('#btnSimpanSaldoAwal').on('click', function(e) {
                 e.preventDefault();
 
-                // serialize form area Input Saldo Awal saja:
                 const payload = {
                     mst_akun_id: $('#kode_akun_id').val(),
                     'sub_akun_id[]': [],
                     'nominal[]': []
                 };
 
-                // ambil semua pair
                 $('#pair-wrap .bb-pair').each(function() {
                     const sid = $(this).find('.sub-akun-select').val();
                     const val = $(this).find('.bb-nominal').val();
-                    // tetap kirim walau kosong; backend akan filter
                     payload['sub_akun_id[]'].push(sid);
                     payload['nominal[]'].push(val);
                 });
@@ -665,7 +662,6 @@
                     })
                     .done(function(res) {
                         if (res && res.ok) {
-                            // update total UI bila perlu
                             if (typeof res.total !== 'undefined') {
                                 const fmt = x => 'Rp. ' + (x || 0).toString().replace(
                                     /\B(?=(\d{3})+(?!\d))/g, '.');
@@ -684,6 +680,169 @@
                         (window.toastr && toastr.error) ? toastr.error(msg): alert(msg);
                     });
             });
+        })();
+
+        (function() {
+            const $tipe = $('#tipe_transaksi');
+            const $rowManual = $('#rowManualAccounts');
+            const $deb = $('#akun_debet_id');
+            const $kred = $('#akun_kredit_id');
+
+            function loadAkunOptions() {
+                if ($deb.data('loaded') === true) return;
+                $.get('/buku_besar/mst_akun', function(res) {
+                    if (!res || !res.ok) return;
+                    const opts = ['<option value="" disabled selected>Pilih Akun</option>'];
+                    res.data.forEach(a => opts.push(
+                        `<option value="${a.id}">${a.kode_akun} - ${a.nama_akun}</option>`));
+                    $deb.html(opts.join(''));
+                    $kred.html(opts.join(''));
+                    $deb.data('loaded', true);
+                });
+            }
+
+            function applyTipe() {
+                const isManual = $tipe.val() === 'Manual';
+                if (isManual) {
+                    $rowManual.show();
+                    $deb.prop('required', true);
+                    $kred.prop('required', true);
+                    loadAkunOptions();
+                } else {
+                    $rowManual.hide();
+                    $deb.prop('required', false).val('');
+                    $kred.prop('required', false).val('');
+                }
+            }
+
+            applyTipe();
+            $tipe.on('change', applyTipe);
+
+            $('#btnSimpanTransaksi').on('click', function(e) {
+                e.preventDefault();
+
+                const toNumber = v => parseInt(String(v || '').replace(/[^\d-]/g, ''), 10) || 0;
+
+                const tipe = $tipe.val();
+                const nominal = toNumber($('#trx_nominal').val());
+                const tanggal = $('#trx_tanggal').val();
+                const keterangan = $('#keterangan').val();
+                const akunDebet = $deb.val() || null;
+                const akunKredit = $kred.val() || null;
+
+                if (!tipe) return (toastr?.error?.('Pilih tipe transaksi') || alert('Pilih tipe transaksi'));
+                if (!tanggal) return (toastr?.error?.('Tanggal wajib diisi') || alert('Tanggal wajib diisi'));
+                if (!nominal) return (toastr?.error?.('Nominal tidak valid') || alert('Nominal tidak valid'));
+                if (tipe === 'Manual') {
+                    if (!akunDebet || !akunKredit)
+                        return (toastr?.error?.('Pilih akun debet & akun kredit') || alert(
+                            'Pilih akun debet & akun kredit'));
+                    if (akunDebet === akunKredit)
+                        return (toastr?.error?.('Akun debet & kredit tidak boleh sama') || alert(
+                            'Akun debet & kredit tidak boleh sama'));
+                }
+
+                const $btn = $(this).prop('disabled', true).text('Menyimpan...');
+
+                $.post('/buku_besar/storetransaksi', {
+                        tipe,
+                        nominal,
+                        tanggal,
+                        keterangan,
+                        akun_debet_id: akunDebet,
+                        akun_kredit_id: akunKredit,
+                        _token: "{{ csrf_token() }}"
+                    })
+                    .done(function(res) {
+                        if (res?.ok) {
+                            toastr?.success?.('Transaksi berhasil disimpan') || alert(
+                                'Transaksi berhasil disimpan');
+                            $('#trx_nominal').val('');
+                            $('#keterangan').val('');
+                            if (tipe === 'Manual') {
+                                $deb.val('').trigger('change');
+                                $kred.val('').trigger('change');
+                            }
+                        } else {
+                            const msg = res?.message || 'Gagal menyimpan transaksi';
+                            toastr?.error?.(msg) || alert(msg);
+                        }
+                    })
+                    .fail(function(xhr) {
+                        const msg = xhr?.responseJSON?.message || 'Terjadi kesalahan server';
+                        toastr?.error?.(msg) || alert(msg);
+                    })
+                    .always(function() {
+                        $btn.prop('disabled', false).text('Simpan');
+                    });
+            });
+        })();
+    </script>
+    <script>
+        (function() {
+            const rp = n => {
+                n = Number(n || 0);
+                return 'Rp. ' + n.toLocaleString('id-ID');
+            };
+
+            // ====== JURNAL UMUM ======
+            function loadJurnal(page = 1) {
+                const q = $('#searchJurnal').val() || '';
+                $.getJSON('/buku_besar/get_jurnal', {
+                    search: q,
+                    page,
+                    per_page: 20
+                }, function(res) {
+                    const $tb = $('#tblJurnal tbody');
+                    if ($tb.length === 0) $('#tblJurnal').append('<tbody></tbody>');
+                    const $body = $('#tblJurnal tbody').empty();
+
+                    (res.data || []).forEach(r => {
+                        $body.append(
+                            `<tr>
+            <td>${r.tanggal ?? ''}</td>
+            <td>${r.keterangan ?? ''}</td>
+            <td>${r.nama_akun ?? ''}</td>
+            <td class="text-success">${rp(r.debet)}</td>
+            <td class="text-danger">${rp(r.kredit)}</td>
+            <td>${r.tipe ?? ''}</td>
+          </tr>`
+                        );
+                    });
+                    $('#pgJurnal').text(`Total: ${res.total} | Hal: ${res.page}`);
+                });
+            }
+            $('#searchJurnal').on('input', () => loadJurnal(1));
+            loadJurnal();
+
+            // ====== BUKU BESAR ======
+            function loadBuku(page = 1) {
+                const q = $('#searchBuku').val() || '';
+                $.getJSON('/buku_besar/get_buku_besar', {
+                    search: q,
+                    page,
+                    per_page: 20
+                }, function(res) {
+                    if ($('#tblBuku tbody').length === 0) $('#tblBuku').append('<tbody></tbody>');
+                    const $body = $('#tblBuku tbody').empty();
+
+                    (res.data || []).forEach(r => {
+                        $body.append(
+                            `<tr>
+            <td>${r.nama_akun ?? ''}</td>
+            <td>${r.tanggal ?? ''}</td>
+            <td class="text-success">${rp(r.debet)}</td>
+            <td class="text-danger">${rp(r.kredit)}</td>
+            <td>${rp(r.saldo)}</td>
+            <td>${r.tipe ?? ''}</td>
+          </tr>`
+                        );
+                    });
+                    $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);
+                });
+            }
+            $('#searchBuku').on('input', () => loadBuku(1));
+            loadBuku();
         })();
     </script>
 @endpush

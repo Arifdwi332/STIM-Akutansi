@@ -7,6 +7,7 @@ use Yajra\DataTables\Facades\DataTables;
 use App\Models\MstAkunModel;
 use App\Models\DatAkunModel;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class BukuBesarController extends Controller
 {
@@ -158,16 +159,14 @@ public function subAkunList(Request $r)
 }
   public function storeSaldoAwal(Request $r)
     {
-        // 👉 pastikan name field di form: mst_akun_id, sub_akun_id[], nominal[]
         $mstId   = $r->input('mst_akun_id');
-        $subIds  = $r->input('sub_akun_id', []);    // array (boleh kosong)
-        $nominal = $r->input('nominal', []);        // array rupiah/string
+        $subIds  = $r->input('sub_akun_id', []);   
+        $nominal = $r->input('nominal', []);       
 
         if (!$mstId) {
             return response()->json(['ok'=>false,'message'=>'Kode akun wajib diisi'], 422);
         }
 
-        // bersihkan rupiah -> integer
         $clean = static function($v){
             $n = (int) preg_replace('/[^\d\-]/', '', (string)$v);
             return max(0, $n);
@@ -197,7 +196,6 @@ public function subAkunList(Request $r)
                 $mst->saldo_berjalan  = (string)($currJalan + $total);
                 $mst->save();
 
-                // agregasi jika ada sub yang dobel pada input
                 $bySub = [];
                 for ($i=0; $i<$count; $i++) {
                     $sid = $subIds[$i] ?? null;
@@ -207,8 +205,6 @@ public function subAkunList(Request $r)
                 }
 
                 if (!empty($bySub)) {
-                    // update masing-masing sub akun
-                    // hanya yang valid/exists
                     $subs = DatAkunModel::whereIn('id', array_keys($bySub))
                             ->lockForUpdate()
                             ->get();
@@ -238,5 +234,235 @@ public function subAkunList(Request $r)
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+        
+    public function storetransaksi(Request $request)
+    {
+        $request->validate([
+            'tipe' => 'required|string',
+            'nominal' => 'required|numeric',
+            'tanggal' => 'required|date',
+            'keterangan' => 'nullable|string',
+            'akun_debet_id' => 'nullable|exists:mst_akun,id',
+            'akun_kredit_id' => 'nullable|exists:mst_akun,id',
+        ]);
+
+        if ($request->tipe === 'Manual') {
+            $request->validate([
+                'akun_debet_id'  => 'required|exists:mst_akun,id|different:akun_kredit_id',
+                'akun_kredit_id' => 'required|exists:mst_akun,id',
+            ]);
+        }
+
+        $tipe     = $request->tipe;
+        $nominal  = (float) $request->nominal;
+        $tanggal  = \Carbon\Carbon::parse($request->tanggal)->toDateString();
+        $ket      = $request->keterangan ?? null;
+        $akunD    = $request->akun_debet_id;
+        $akunK    = $request->akun_kredit_id;
+
+        DB::beginTransaction();
+        try {
+            if ($tipe === 'Manual') {
+                // 1) Header jurnal
+                $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
+                    'tgl_transaksi' => $tanggal,
+                    'no_referensi'  => 'tes',
+                    'keterangan'    => $ket,
+                    'modul_sumber'  => 'tes',
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ]);
+
+                // 2) Detail jurnal (Debet)
+                DB::table('dat_detail_jurnal')->insert([
+                    'id_jurnal'   => $idJurnal,
+                    'id_akun'     => $akunD,
+                    'jml_debit'   => $nominal,
+                    'jml_kredit'  => 0,
+                    'id_proyek'   => null,
+                    'kode_pajak'  => null,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+
+                // 3) Detail jurnal (Kredit)
+                DB::table('dat_detail_jurnal')->insert([
+                    'id_jurnal'   => $idJurnal,
+                    'id_akun'     => $akunK,
+                    'jml_debit'   => 0,
+                    'jml_kredit'  => $nominal,
+                    'id_proyek'   => null,
+                    'kode_pajak'  => null,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+
+                // 4) Buku Besar (per-periode)
+                foreach ([$akunD => ['debit' => $nominal, 'kredit' => 0],
+                        $akunK => ['debit' => 0, 'kredit' => $nominal]] as $akunId => $val) {
+
+                    $periode = Carbon::parse($tanggal)->format('Y-m');
+
+                    $bukbes = DB::table('dat_buku_besar')
+                        ->where('id_akun', $akunId)
+                        ->where('periode', $periode)
+                        ->first();
+
+                    if ($bukbes) {
+                        DB::table('dat_buku_besar')
+                            ->where('id_bukbes', $bukbes->id_bukbes)
+                            ->update([
+                                'ttl_debit'   => (float)$bukbes->ttl_debit + (float)$val['debit'],
+                                'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
+                                'saldo_akhir' => (float)$bukbes->saldo_akhir + (float)$val['debit'] - (float)$val['kredit'],
+                                'updated_at'  => now(),
+                            ]);
+                    } else {
+                        \DB::table('dat_buku_besar')->insert([
+                            'id_akun'     => $akunId,
+                            'periode'     => $periode,
+                            'ttl_debit'   => (float)$val['debit'],
+                            'ttl_kredit'  => (float)$val['kredit'],
+                            'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                            'created_at'  => now(),
+                            'updated_at'  => now(),
+                        ]);
+                    }
+                }
+
+              
+                $saldoDeb = (float) \DB::table('mst_akun')->where('id', $akunD)->value('saldo_berjalan');
+                $saldoKrd = (float) \DB::table('mst_akun')->where('id', $akunK)->value('saldo_berjalan');
+
+                \DB::table('mst_akun')->where('id', $akunD)->update([
+                    'saldo_berjalan' => $saldoDeb + $nominal,
+                    'updated_at'     => now(),
+                ]);
+
+                \DB::table('mst_akun')->where('id', $akunK)->update([
+                    'saldo_berjalan' => $saldoKrd - $nominal,
+                    'updated_at'     => now(),
+                ]);
+               
+            }
+
+            \DB::commit();
+            return response()->json(['ok' => true, 'message' => 'Transaksi tersimpan']);
+        } catch (\Throwable $e) {
+            \DB::rollBack();
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+      public function getJurnal(Request $request)
+    {
+        $search   = trim($request->get('search', ''));
+        $dateFrom = $request->get('date_from'); // 'YYYY-MM-DD'
+        $dateTo   = $request->get('date_to');   // 'YYYY-MM-DD'
+        $page     = max(1, (int) $request->get('page', 1));
+        $perPage  = max(1, min(100, (int) $request->get('per_page', 20)));
+
+        $q = DB::table('dat_detail_jurnal as d')
+        ->join('dat_header_jurnal as h', 'h.id_jurnal', '=', 'd.id_jurnal')
+        ->join('mst_akun as a', 'a.id', '=', 'd.id_akun')
+        ->select([
+                'h.tgl_transaksi as tanggal',
+                'h.keterangan',
+                'a.nama_akun',
+                'd.jml_debit as debet',
+                'd.jml_kredit as kredit',
+                DB::raw("COALESCE(h.modul_sumber, 'Manual') as tipe"),
+                 'a.saldo_berjalan as saldo',
+            ]);
+
+        if ($search !== '') {
+            $q->where(function($w) use ($search) {
+                $w->where('h.keterangan', 'like', "%{$search}%")
+                  ->orWhere('a.nama_akun', 'like', "%{$search}%")
+                  ->orWhere('a.kode_akun', 'like', "%{$search}%");
+            });
+        }
+
+        if ($dateFrom) {
+            $q->whereDate('h.tgl_transaksi', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $q->whereDate('h.tgl_transaksi', '<=', $dateTo);
+        }
+
+        $total = (clone $q)->count();
+        $rows  = $q->orderBy('h.tgl_transaksi', 'desc')
+                   ->offset(($page-1)*$perPage)
+                   ->limit($perPage)
+                   ->get()
+                   ->map(function($r){
+                        // pastikan numeric
+                        $r->debet  = (float) $r->debet;
+                        $r->kredit = (float) $r->kredit;
+                        $r->saldo  = (float) $r->saldo;
+                        return $r;
+                   });
+
+        return response()->json([
+            'ok'        => true,
+            'data'      => $rows,
+            'page'      => $page,
+            'per_page'  => $perPage,
+            'total'     => $total,
+        ]);
+    }
+
+    
+    public function getBukuBesar(Request $request)
+    {
+        $search   = trim($request->get('search', ''));
+        $periode  = $request->get('periode'); 
+        $page     = max(1, (int) $request->get('page', 1));
+        $perPage  = max(1, min(100, (int) $request->get('per_page', 20)));
+
+            $q = DB::table('dat_buku_besar as b')
+            ->join('mst_akun as a', 'a.id', '=', 'b.id_akun')
+            ->select([
+                'a.nama_akun',
+                'b.periode as tanggal', 
+                'b.ttl_debit as debet',
+                'b.ttl_kredit as kredit',
+                'a.saldo_berjalan as saldo',
+                 DB::raw("'Manual' as tipe"),
+            ]);
+
+        if ($search !== '') {
+            $q->where(function($w) use ($search) {
+                $w->where('a.nama_akun', 'like', "%{$search}%")
+                  ->orWhere('a.kode_akun', 'like', "%{$search}%")
+                  ->orWhere('b.periode', 'like', "%{$search}%");
+            });
+        }
+
+        if ($periode) {
+            $q->where('b.periode', $periode); 
+        }
+
+        $total = (clone $q)->count();
+        $rows  = $q->orderBy('b.periode', 'desc')
+                   ->orderBy('a.nama_akun')
+                   ->offset(($page-1)*$perPage)
+                   ->limit($perPage)
+                   ->get()
+                   ->map(function($r){
+                        $r->debet  = (float) $r->debet;
+                        $r->kredit = (float) $r->kredit;
+                        $r->saldo  = (float) $r->saldo;
+                        return $r;
+                   });
+
+        return response()->json([
+            'ok'        => true,
+            'data'      => $rows,
+            'page'      => $page,
+            'per_page'  => $perPage,
+            'total'     => $total,
+        ]);
     }
 }
