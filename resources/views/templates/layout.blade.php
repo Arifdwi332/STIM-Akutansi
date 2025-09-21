@@ -121,6 +121,34 @@
     .dataTables_wrapper .row {
         overflow-x: auto;
     }
+
+
+    /* Sidebar Warna Custom  */
+
+    /* Teks & ikon default */
+    .nav-sidebar .nav-link {
+        color: #1E5296 !important;
+    }
+
+    /* Hover */
+    .nav-sidebar .nav-link:hover {
+        background-color: rgba(30, 82, 150, 0.08) !important;
+        color: #1E5296 !important;
+    }
+
+    /* Aktif (halaman yang sedang dibuka) */
+    .nav-sidebar .nav-link.active {
+        background-color: #1E5296 !important;
+        /* latar biru */
+        color: #fff !important;
+        /* teks putih */
+    }
+
+
+    .nav-sidebar .nav-link.active i,
+    .nav-sidebar .nav-link i {
+        color: inherit !important;
+    }
 </style>
 
 <body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed">
@@ -177,7 +205,8 @@
                     </div>
                 </div>
 
-                <!-- Sidebar Menu -->
+
+
                 <nav class="mt-2">
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
@@ -187,10 +216,60 @@
                                 <p>Dashboard</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route('buku_besar.index') }}"
+                                class="nav-link {{ request()->routeIs('buku_besar.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-layer-group"></i>
+                                <p>Buku Besar</p>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-box-open"></i>
+                                <p>Inventaris</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-coins"></i>
+                                <p>Laporan Keuangan</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-file-invoice"></i>
+                                <p>Faktur / Nota</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-file-contract"></i>
+                                <p>Integrasi Pajak</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-file-alt"></i>
+                                <p>Report</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-chart-line"></i>
+                                <p>Rekom Break Event</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-user"></i>
+                                <p>User</p>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
 
-                <!-- /.sidebar-menu -->
+
 
             </div>
             <!-- /.sidebar -->
