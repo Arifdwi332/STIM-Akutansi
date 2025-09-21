@@ -241,7 +241,7 @@
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label for="kode_akun_id">Kode Akun</label>
-                                <select id="kode_akun_id" class="form-control" required>
+                                <select id="kode_akun_id" name="mst_akun_id" class="form-control" required>
                                     <option value="" disabled selected>Pilih Kode Akun</option>
                                 </select>
                             </div>
@@ -261,13 +261,15 @@
                                     <!-- pasangan pertama -->
                                     <div class="form-row align-items-start bb-pair">
                                         <div class="col-md-6 mb-2">
-                                            <select class="form-control sub-akun-select" id="sub_akun_id" disabled>
+                                            <select class="form-control sub-akun-select" id="sub_akun_id"
+                                                name="sub_akun_id[]" disabled>
                                                 <option value="" disabled selected>Pilih Sub Akun</option>
                                             </select>
                                         </div>
                                         <div class="col-md-6 mb-2">
                                             <div class="input-group">
-                                                <input type="text" class="form-control bb-nominal" placeholder="Rp">
+                                                <input type="text" class="form-control bb-nominal" name="nominal[]"
+                                                    placeholder="Rp">
                                                 <div class="input-group-append">
                                                     <button type="button" class="btn btn-danger remove-pair">
                                                         <i class="fas fa-trash"></i>
@@ -486,30 +488,30 @@
 
             function buildPair() {
                 return $(`
-      <div class="form-row align-items-start bb-pair">
-        <div class="col-md-7 mb-2">
-          <select class="form-control sub-akun-select">
-            ${subOptionsHtml}
-          </select>
-        </div>
-        <div class="col-md-5 mb-2">
-          <div class="input-group">
-            <input type="text" class="form-control bb-nominal" placeholder="Rp">
-            <div class="input-group-append">
-              <button type="button" class="btn btn-danger remove-pair">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `);
+                    <div class="form-row align-items-start bb-pair">
+                    <div class="col-md-6 mb-2">
+                        <select class="form-control sub-akun-select" name="sub_akun_id[]">
+                        ${subOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <div class="input-group">
+                        <input type="text" class="form-control bb-nominal" name="nominal[]" placeholder="Rp">
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-danger remove-pair">
+                            <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                `);
             }
+
 
             // Tambah pasangan
             $btnAdd.on('click', function() {
                 const $row = buildPair();
-                // samakan disable state dg dropdown pertama (kalau belum ada data sub)
                 const disabled = $pairs.find('.sub-akun-select').first().prop('disabled');
                 $row.find('.sub-akun-select').prop('disabled', disabled);
                 $pairs.append($row);
@@ -627,5 +629,61 @@
                     });
             });
         });
+    </script>
+    <script>
+        (function() {
+            // submit saldo awal
+            $(document).on('click', '.bb-panel .btn.btn-primary:contains("Simpan")', function(e) {
+                e.preventDefault();
+
+                // serialize form area Input Saldo Awal saja:
+                const payload = {
+                    mst_akun_id: $('#kode_akun_id').val(),
+                    'sub_akun_id[]': [],
+                    'nominal[]': []
+                };
+
+                // ambil semua pair
+                $('#pair-wrap .bb-pair').each(function() {
+                    const sid = $(this).find('.sub-akun-select').val();
+                    const val = $(this).find('.bb-nominal').val();
+                    // tetap kirim walau kosong; backend akan filter
+                    payload['sub_akun_id[]'].push(sid);
+                    payload['nominal[]'].push(val);
+                });
+
+                $.ajax({
+                        method: 'POST',
+                        url: "{{ route('buku_besar.saldo_awal.store') }}",
+                        data: {
+                            mst_akun_id: payload.mst_akun_id,
+                            'sub_akun_id': payload['sub_akun_id[]'],
+                            'nominal': payload['nominal[]'],
+                            _token: "{{ csrf_token() }}"
+                        },
+                        dataType: 'json'
+                    })
+                    .done(function(res) {
+                        if (res && res.ok) {
+                            // update total UI bila perlu
+                            if (typeof res.total !== 'undefined') {
+                                const fmt = x => 'Rp. ' + (x || 0).toString().replace(
+                                    /\B(?=(\d{3})+(?!\d))/g, '.');
+                                $('#bb-total').val(fmt(res.total));
+                            }
+                            (window.toastr && toastr.success) ? toastr.success('Saldo awal tersimpan'):
+                                alert('Saldo awal tersimpan');
+                        } else {
+                            const msg = (res && res.message) ? res.message : 'Gagal menyimpan saldo awal';
+                            (window.toastr && toastr.error) ? toastr.error(msg): alert(msg);
+                        }
+                    })
+                    .fail(function(xhr) {
+                        let msg = 'Gagal menyimpan saldo awal';
+                        if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                        (window.toastr && toastr.error) ? toastr.error(msg): alert(msg);
+                    });
+            });
+        })();
     </script>
 @endpush
