@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- PWA  -->
+
     <meta name="theme-color" content="#6777ef" />
     <link rel="apple-touch-icon" href="{{ asset('logo.png') }}">
     <link rel="manifest" href="{{ asset('/manifest.json') }}">
@@ -225,7 +226,8 @@
                         </li>
 
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{{ route('inventaris.index') }}"
+                                class="nav-link {{ request()->routeIs('inventaris.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-box-open"></i>
                                 <p>Inventaris</p>
                             </a>
@@ -294,6 +296,7 @@
                 <div class="container-fluid">
                     <!-- Info boxes -->
                     @yield('content')
+
                     <!-- /.row -->
                     <style>
                         input[type="radio"] {
