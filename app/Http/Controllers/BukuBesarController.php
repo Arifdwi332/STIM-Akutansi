@@ -253,6 +253,7 @@ public function subAkunList(Request $r)
                 'akun_kredit_id' => 'required|exists:mst_akun,id',
             ]);
         }
+        
 
         $tipe     = $request->tipe;
         $nominal  = (float) $request->nominal;
@@ -346,6 +347,43 @@ public function subAkunList(Request $r)
                 ]);
                
             }
+           elseif (in_array($tipe, [
+            'Bayar Gaji',
+            'Bayar Listrik',
+            'Bayar Utang Bank',
+            'Beli Peralatan Tunai',
+            'Beli ATK Tunai',
+            'Pengambilan Pribadi',
+            'Pinjam Uang di Bank',
+            'Pendapatan Bunga',
+            'Setoran Pemilik',
+        ], true)) {
+
+            $map = [
+                'Bayar Gaji'         =>  [7,  1, 1, 1],
+                'Bayar Listrik'      =>  [8,  1, 1, 1],
+                'Bayar Utang Bank'   => [9,  1, 1, 1],
+                'Beli Peralatan Tunai' =>  [10, 1, 2, 2],
+                'Beli ATK Tunai'     => [11, 1, 2, 2],
+                'Pengambilan Pribadi'     => [12, 1, 2, 2],
+                'Pinjam Uang di Bank'     => [1, 14, 2, 2],
+                'Pendapatan Bunga'     => [1, 15, 1, 1],
+                'Setoran Pemilik'     => [1, 16, 2, 2],
+            ];
+
+            [$akunD, $akunK, $jlD, $jlK] = $map[$tipe];
+
+            $this->insertJurnalSimple(
+                $tanggal,
+                (float)$nominal,
+                $ket,
+                (int)$akunD,
+                (int)$akunK,
+                (int) $jlD,   
+                (int) $jlK    
+            );
+        }
+
 
             \DB::commit();
             return response()->json(['ok' => true, 'message' => 'Transaksi tersimpan']);
@@ -355,6 +393,99 @@ public function subAkunList(Request $r)
         }
     }
 
+    private function insertJurnalSimple(
+        string $tanggal,
+        float $nominal,
+        ?string $keterangan,
+        int $akunDebet,
+        int $akunKredit,
+        int $jenisLaporanDebet = 1,
+        int $jenisLaporanKredit = 1,
+        string $noReferensi = 'tes',
+        string $modulSumber = 'tes'
+    ): void {
+        // 1) Header jurnal
+        $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
+            'tgl_transaksi' => $tanggal,
+            'no_referensi'  => $noReferensi,
+            'keterangan'    => $keterangan,
+            'modul_sumber'  => $modulSumber,
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        // 2) Detail jurnal (insert sekaligus 2 baris)
+        DB::table('dat_detail_jurnal')->insert([
+            [
+                'id_jurnal'     => $idJurnal,
+                'id_akun'       => $akunDebet,
+                'jml_debit'     => $nominal,
+                'jml_kredit'    => 0,
+                'id_proyek'     => null,
+                'kode_pajak'    => null,
+                'jenis_laporan' => $jenisLaporanDebet,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+            [
+                'id_jurnal'     => $idJurnal,
+                'id_akun'       => $akunKredit,
+                'jml_debit'     => 0,
+                'jml_kredit'    => $nominal,
+                'id_proyek'     => null,
+                'kode_pajak'    => null,
+                'jenis_laporan' => $jenisLaporanKredit,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+        ]);
+
+        // 3) Buku Besar (per-periode)
+        $periode = Carbon::parse($tanggal)->format('Y-m');
+
+        foreach ([
+            $akunDebet  => ['debit' => $nominal, 'kredit' => 0],
+            $akunKredit => ['debit' => 0,        'kredit' => $nominal],
+        ] as $akunId => $val) {
+            $bukbes = DB::table('dat_buku_besar')
+                ->where('id_akun', $akunId)
+                ->where('periode', $periode)
+                ->lockForUpdate()
+                ->first();
+
+            if ($bukbes) {
+                DB::table('dat_buku_besar')
+                    ->where('id_bukbes', $bukbes->id_bukbes)
+                    ->update([
+                        'ttl_debit'   => (float)$bukbes->ttl_debit + (float)$val['debit'],
+                        'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
+                        'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
+                        'updated_at'  => now(),
+                    ]);
+            } else {
+                DB::table('dat_buku_besar')->insert([
+                    'id_akun'     => $akunId,
+                    'periode'     => $periode,
+                    'ttl_debit'   => (float)$val['debit'],
+                    'ttl_kredit'  => (float)$val['kredit'],
+                    'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+            }
+        }
+
+        // 4) Update saldo_berjalan (atomic, dengan lock)
+        $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()->increment('saldo_berjalan', $nominal);
+        $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
+
+        if ($affD === 0) {
+            throw new \RuntimeException("Akun debet (ID {$akunDebet}) tidak ditemukan di mst_akun.");
+        }
+        if ($affK === 0) {
+            throw new \RuntimeException("Akun kredit (ID {$akunKredit}) tidak ditemukan di mst_akun.");
+        }
+    }
       public function getJurnal(Request $request)
     {
         $search   = trim($request->get('search', ''));

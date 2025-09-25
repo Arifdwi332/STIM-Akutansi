@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BukuBesarController;
 use App\Http\Controllers\InventarisController;
-
+use App\Http\Controllers\LaporanKeuanganController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -57,6 +57,16 @@ Route::prefix('inventaris')->name('inventaris.')->group(function () {
     Route::get('/transaksi', [InventarisController::class, 'datatableTransaksi'])
     ->name('dt.transaksi');
 
-Route::get('/inventaris', [InventarisController::class, 'datatableInventaris'])
-    ->name('dt.inventaris');
+    Route::get('/inventaris', [InventarisController::class, 'datatableInventaris'])->name('dt.inventaris');
+    Route::get('/barang-by-pemasok', [InventarisController::class, 'getBarangByPemasok'])->name('barangByPemasok');
+    Route::get('/barang-semua', [InventarisController::class, 'getBarangSemua'])->name('barangSemua');
 });
+
+Route::prefix('laporan_keuangan')->name('laporan_keuangan.')->group(function () {
+    Route::get('/', [LaporanKeuanganController::class, 'index'])->name('index');
+    Route::get('/get_laba_rugi', [LaporanKeuanganController::class, 'getLabaRugi'])->name('get_laba_rugi');
+
+    Route::get('/get_neraca', [LaporanKeuanganController::class, 'getNeraca'])->name('get_neraca');
+});
+
+

@@ -233,7 +233,8 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{{ route('laporan_keuangan.index') }}"
+                                class="nav-link {{ request()->routeIs('laporan_keuangan.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-coins"></i>
                                 <p>Laporan Keuangan</p>
                             </a>

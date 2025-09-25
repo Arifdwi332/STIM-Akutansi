@@ -12,6 +12,7 @@ class PemasokModel extends Model
     public $timestamps = true;
 
     protected $fillable = [
+        'kode_pemasok',
         'nama_pemasok',
         'alamat',
         'no_hp',
@@ -19,4 +20,14 @@ class PemasokModel extends Model
         'npwp',
         'saldo_utang',
     ];
+
+    protected $casts = [
+        'saldo_utang' => 'float',
+    ];
+
+    
+    public function barang()
+    {
+        return $this->hasMany(DatBarangModel::class, 'kode_pemasok', 'id_pemasok');
+    }
 }

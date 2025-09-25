@@ -307,8 +307,15 @@
                             <div class="form-group col-md-6">
                                 <label>Tipe Transaksi</label>
                                 <select id="tipe_transaksi" class="custom-select">
-                                    <option value="Pembelian">Pembelian</option>
-                                    <option value="Penjualan">Penjualan</option>
+                                    <option value="Bayar Gaji">Bayar Gaji</option>
+                                    <option value="Bayar Listrik">Bayar Listrik</option>
+                                    <option value="Bayar Utang Bank">Bayar Utang Bank</option>
+                                    <option value="Beli Peralatan Tunai">Beli Peralatan Tunai</option>
+                                    <option value="Beli ATK Tunai">Beli ATK Tunai</option>
+                                    <option value="Pengambilan Pribadi">Pengambilan Pribadi</option>
+                                    <option value="Pinjam Uang di Bank">Pinjam Uang di Bank</option>
+                                    <option value="Pendapatan Bunga">Pendapatan Bunga</option>
+                                    <option value="Setoran Pemilik">Setoran Pemilik</option>
                                     <option value="Manual">Manual</option>
                                 </select>
                             </div>
@@ -376,7 +383,7 @@
                                             <th>Nama Akun</th>
                                             <th class="text-success">Debet</th>
                                             <th class="text-danger">Kredit</th>
-                                            <th>Tipe</th>
+                                            {{-- <th>Tipe</th> --}}
                                         </tr>
                                     </thead>
                                 </table>
@@ -407,7 +414,7 @@
                                             <th class="text-success">Debet</th>
                                             <th class="text-danger">Kredit</th>
                                             <th>Saldo</th>
-                                            <th>Tipe</th>
+                                            {{-- <th>Tipe</th> --}}
                                         </tr>
                                     </thead>
                                 </table>
@@ -805,7 +812,6 @@
             <td>${r.nama_akun ?? ''}</td>
             <td class="text-success">${rp(r.debet)}</td>
             <td class="text-danger">${rp(r.kredit)}</td>
-            <td>${r.tipe ?? ''}</td>
           </tr>`
                         );
                     });
@@ -834,7 +840,7 @@
             <td class="text-success">${rp(r.debet)}</td>
             <td class="text-danger">${rp(r.kredit)}</td>
             <td>${rp(r.saldo)}</td>
-            <td>${r.tipe ?? ''}</td>
+          
           </tr>`
                         );
                     });

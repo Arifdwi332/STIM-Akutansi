@@ -70,12 +70,35 @@
 
                 <!-- Body -->
                 <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
+                    <div class="form-group">
+
+                        <input type="hidden" class="form-control" id="kode_pemasok" name="kode_pemasok" required>
+                    </div>
                     <div class="form-group mb-3">
                         <label class="mb-1" for="nama_pemasok" style="font-weight:600;">Nama Pemasok</label>
                         <input type="text" class="form-control" id="nama_pemasok" name="nama_pemasok"
                             placeholder="Nama Pemasok" required>
                     </div>
-
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="nama_barang" style="font-weight:600;">Nama Barang</label>
+                        <input type="text" class="form-control" id="nama_barang" name="nama_barang"
+                            placeholder="Nama Barang" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="harga_satuan" style="font-weight:600;">Harga Satuan</label>
+                        <input type="number" class="form-control" id="harga_satuan" name="harga_satuan"
+                            placeholder="Harga Satuan" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="satuan_ukur" style="font-weight:600;">Satuan Ukur</label>
+                        <input type="text" class="form-control" id="satuan_ukur" name="satuan_ukur"
+                            placeholder="Satuan Ukur" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="harga_jual" style="font-weight:600;">Harga Jual</label>
+                        <input type="number" class="form-control" id="harga_jual" name="harga_jual"
+                            placeholder="Harga Jual" required>
+                    </div>
                     <div class="form-group mb-3">
                         <label class="mb-1" for="alamat_pemasok" style="font-weight:600;">Alamat</label>
                         <textarea class="form-control" id="alamat_pemasok" name="alamat" rows="3" placeholder="Alamat lengkap"></textarea>

@@ -190,6 +190,13 @@
                             <option value="Inventaris" selected>Inventaris</option>
                         </select>
                     </div>
+                    <div class="form-group col-md-3">
+                        <label class="mb-1">Tipe Pembayaran</label>
+                        <select id="tipe_pembayaran" name="tipe_pembayaran" class="form-control">
+                            <option value="1">Tunai</option>
+                            <option value="2" selected>Non Tunai</option>
+                        </select>
+                    </div>
                 </div>
 
                 {{-- Baris 1 --}}
@@ -199,7 +206,6 @@
                         <label class="mb-1">Tanggal</label>
                         <div class="input-group">
                             <input type="date" class="form-control" id="tgl_transaksi" placeholder="xx/xx/xxxx">
-
                         </div>
                     </div>
 
@@ -208,9 +214,7 @@
                     {{-- Pelanggan/Pemasok --}}
                     <div class="form-group d-flex flex-column fx-260">
                         <label class="mb-1" id="party_label">Pelanggan</label>
-                        <select id="party_id" class="form-control">
-
-                        </select>
+                        <select id="party_id" class="form-control"></select>
                     </div>
 
                     <div class="gap-12"></div>
@@ -226,8 +230,8 @@
 
                     {{-- No Transaksi --}}
                     <div class="form-group d-flex flex-column fx-180">
-                        <label class="mb-1">No Transaksi</label>
-                        <input type="text" class="form-control" id="no_transaksi" value="S0000003" readonly>
+                        {{-- <label class="mb-1">No Transaksi</label> --}}
+                        <input type="hidden" class="form-control" id="no_transaksi" readonly>
                     </div>
                 </div>
 
@@ -240,7 +244,8 @@
                                 <th>Barang</th>
                                 <th class="w-qty">Qty</th>
                                 <th class="w-unit">Satuan Ukur</th>
-                                <th class="w-price">Harga Satuan</th>
+                                <th class="w-price">Harga Satuan Beli</th>
+                                <th class="w-price">Harga Satuan Jual</th>
                                 <th class="w-sub">Total</th>
                                 <th class="w-act"></th>
                             </tr>
@@ -257,6 +262,9 @@
                                 <td><input type="text" class="form-control item-satuan" readonly placeholder="-"></td>
                                 <td class="text-right">
                                     <input type="text" class="form-control item-harga" value="0">
+                                </td>
+                                <td class="text-right">
+                                    <input type="text" class="form-control item-jual" value="0">
                                 </td>
                                 <td class="text-right">
                                     <input type="text" class="form-control item-subtotal" value="0" readonly>
@@ -344,7 +352,7 @@
                                         <th>Nama Pelanggan</th>
                                         <th>Deskripsi</th>
                                         <th style="width:80px;">Qty</th>
-                                        <th style="width:150px;">Total Harga</th>
+                                        <th style="width:150px;">Harga</th>
                                         <th style="width:100px;">Aksi</th>
                                     </tr>
                                 </thead>
@@ -394,6 +402,7 @@
                 }
             });
         });
+
         // === Helpers global ===
         window.toNumber = function(v) {
             let s = String(v ?? '').trim();
@@ -418,12 +427,6 @@
                 $body.find('tr').each((i, tr) => $(tr).find('td:first').text(i + 1));
             }
 
-            function rowSubtotal($tr) {
-                const qty = toNumber($tr.find('.item-qty').val());
-                const harga = toNumber($tr.find('.item-harga').val());
-                $tr.find('.item-subtotal').val(qty * harga);
-            }
-
             function recompute() {
                 let sub = 0;
                 $body.find('.item-subtotal').each(function() {
@@ -438,11 +441,19 @@
                 $('#grand_total').val(fmt(grand));
             }
 
+            function hitungSubtotal($tr) {
+                const qty = toNumber($tr.find('.item-qty').val());
+                const hargaJual = toNumber($tr.find('.item-jual').val());
+                const subtotal = qty * hargaJual;
+                $tr.find('.item-subtotal').val(subtotal);
+            }
+
             function bindRow($tr) {
-                $tr.on('input', '.item-qty,.item-harga', () => {
-                    rowSubtotal($tr);
+                $tr.on('input', '.item-qty,.item-jual', () => {
+                    hitungSubtotal($tr);
                     recompute();
                 });
+
                 $tr.find('.inv-del').on('click', function() {
                     if ($body.find('tr').length <= 1) return;
                     $tr.remove();
@@ -468,12 +479,42 @@
 
             // recompute on extra fields
             $('#biaya_lain,#diskon_persen').on('input', recompute);
-
-            // DataTables
-
         })();
-    </script>
 
+        function hydrateBarangSelects() {
+            $('select.item-nama').each(function() {
+                fillBarangOptions($(this), BARANG);
+            });
+        }
+
+        // --- Loader barang: Penjualan => ALL, Inventaris => by pemasok
+        function loadBarang(mode, pemasokId) {
+            const isPenjualan = mode === 'Penjualan';
+
+            // OPSI A (disarankan): pakai endpoint khusus all items
+            const url = isPenjualan ?
+                "{{ route('inventaris.barangSemua') }}" :
+                "{{ route('inventaris.barangByPemasok') }}";
+
+            const params = isPenjualan ? {} : {
+                pemasok_id: pemasokId
+            };
+
+            $.get(url, params)
+                .done(function(res) {
+                    if (res && res.ok && Array.isArray(res.data)) {
+                        BARANG = res.data;
+                        hydrateBarangSelects();
+                    } else {
+                        BARANG = [];
+                        hydrateBarangSelects();
+                    }
+                })
+                .fail(function() {
+                    alert('Gagal memuat data barang.');
+                });
+        }
+    </script>
 
     <script>
         window.applyMode = function(mode) {
@@ -481,12 +522,11 @@
             $('#party_label').text(isInv ? 'Pemasok' : 'Pelanggan');
             $('#btnAddParty').text(isInv ? 'Tambah Pemasok' : 'Tambah Pelanggan');
 
-            const raw = ($('#no_transaksi').val() || '').replace(/[A-Z]/g, '');
-            const seq = raw || '0000003';
-            $('#no_transaksi').val((isInv ? 'S' : 'P') + seq);
+            $('#no_transaksi').val('');
 
             $('#group_diskon').toggle(!isInv);
         };
+
 
         function loadPartyOptions(tipe) {
             $.get("{{ route('inventaris.parties') }}", {
@@ -509,14 +549,15 @@
         $(function() {
             const $tipe = $('#tipe_transaksi');
 
-            // pertama kali
             applyMode($tipe.val());
             loadPartyOptions($tipe.val());
+            loadBarang($tipe.val(), $('#party_id').val());
 
             $tipe.on('change', function() {
                 const tipeBaru = this.value;
                 applyMode(tipeBaru);
                 loadPartyOptions(tipeBaru);
+                loadBarang(tipeBaru, $('#party_id').val());
             });
 
             $(document).on('click', '#btnAddParty', function() {
@@ -530,67 +571,58 @@
             });
         });
     </script>
+
     <script>
+        // Cache barang terakhir sesuai pemasok terpilih
         let BARANG = [];
 
-        function fetchBarangCatalog() {
-            return $.get("{{ route('inventaris.barang') }}")
-                .done(function(res) {
-                    BARANG = (res && res.ok && Array.isArray(res.data)) ? res.data : [];
-                    $('select.item-nama').each(function() {
-                        renderBarangOptions($(this));
-                    });
-                })
-                .fail(function() {
-                    alert('Gagal memuat katalog barang');
-                });
-        }
-
-        function renderBarangOptions($select, selectedId) {
+        function fillBarangOptions($select, list) {
             $select.empty().append('<option value="">Pilih Barang</option>');
-            BARANG.forEach(function(b) {
-                const opt = new Option(b.nama, b.id, false, String(b.id) === String(selectedId || ''));
-                $select.append(opt);
+            (list || []).forEach(function(b) {
+                // gunakan nama & id sesuai response API
+                $select.append(new Option(b.nama_barang, b.id_barang));
             });
         }
 
         function findBarangById(id) {
-            return BARANG.find(b => String(b.id) === String(id));
+            return BARANG.find(b => String(b.id_barang) === String(id));
         }
 
+        // Ketika user memilih barang di baris tabel
         $(document).on('change', 'select.item-nama', function() {
             const $tr = $(this).closest('tr');
             const id = $(this).val();
             const data = findBarangById(id);
 
             if (!data) {
-                // reset row bila tidak ada data
                 $tr.find('.item-satuan').val('').attr('placeholder', '-');
-                $tr.find('.item-harga').val('0').trigger('input');
+                $tr.find('.item-harga').val('0');
+                $tr.find('.item-jual').val('0');
+                $tr.find('.item-subtotal').val('0');
                 return;
             }
 
             const satuan = data.satuan_ukur || '';
             $tr.find('.item-satuan').val(satuan).attr('placeholder', satuan || '-');
 
-            const harga = toNumber(data.harga_jual || 0);
+            const hargaBeli = toNumber(data.harga_satuan || 0);
+            $tr.find('.item-harga').val(hargaBeli);
+
+            const hargaJual = toNumber(data.harga_jual || 0);
+            $tr.find('.item-jual').val(hargaJual);
 
             const $qty = $tr.find('.item-qty');
             if (!parseFloat(($qty.val() || '').replace(',', '.'))) {
                 $qty.val('1');
             }
 
-            $tr.find('.item-harga').val(harga);
-            $tr.find('.item-harga').trigger('input');
+            $tr.find('.item-jual').trigger('input');
         });
-
 
         $(document).on('click', '#inv-add', function() {
             setTimeout(function() {
                 const $last = $('#inv-rows tr:last');
-                const $sel = $last.find('select.item-nama');
-                renderBarangOptions($sel);
-
+                fillBarangOptions($last.find('select.item-nama'), BARANG);
             }, 0);
         });
 
@@ -600,25 +632,18 @@
                 const id = $tr.find('select.item-nama').val();
                 const data = findBarangById(id);
                 if (!data) return;
-                const harga = window.toNumber(data.harga_jual || 0);
-                $tr.find('.item-harga').val(harga).trigger('input');
+                $tr.find('.item-harga').val(toNumber(data.harga_satuan || 0));
+                $tr.find('.item-jual').val(toNumber(data.harga_jual || 0)).trigger('input');
             });
         }
 
         $(document).on('change', '#tipe_transaksi', function() {
             refreshHargaSemuaBaris();
         });
-
-        $(function() {
-            fetchBarangCatalog().then(function() {
-
-            });
-        });
     </script>
 
-    {{-- CHANGES: submit transaksi ke backend --}}
+
     <script>
-        // Helper aman kalau toNumber belum global
         function _num(v) {
             try {
                 return (typeof toNumber === 'function') ? toNumber(v) : (parseFloat(String(v).replace(/[^\d.-]/g, '')) ||
@@ -639,13 +664,15 @@
                 const qty = _num($tr.find('.item-qty').val());
                 const satuan = ($tr.find('.item-satuan').val() || '').trim() || null;
                 const harga = _num($tr.find('.item-harga').val());
+                const hargajual = _num($tr.find('.item-jual').val());
 
                 if (id && qty > 0) {
                     items.push({
                         barang_id: id,
                         qty: qty,
                         satuan: satuan,
-                        harga: harga
+                        harga: harga,
+                        hargajual: hargajual
                     });
                 }
             });
@@ -656,15 +683,16 @@
             }
 
             const payload = {
-                tipe: $('#tipe_transaksi').val(), // "Penjualan" / "Inventaris"
-                tanggal: $('#tgl_transaksi').val(), // dd/mm/yyyy atau yyyy-mm-dd
-                party_id: $('#party_id').val() || null, // pelanggan/pemasok terpilih
-                no_transaksi: $('#no_transaksi').val(),
+                tipe: $('#tipe_transaksi').val(),
+                tanggal: $('#tgl_transaksi').val(),
+                party_id: $('#party_id').val() || null,
+                tipe_pembayaran: Number($('#tipe_pembayaran').val()),
                 biaya_lain: _num($('#biaya_lain').val()),
                 diskon_persen: _num($('#diskon_persen').val()),
-                pajak_persen: 11, // default 11%
+                pajak_persen: 11,
                 items: items
             };
+
 
             $.ajax({
                     method: 'POST',
@@ -705,8 +733,8 @@
                 });
         });
     </script>
+
     <script>
-        // CHANGES: formatter tampilan
         function toRp(n) {
             n = Number(n || 0);
             return 'Rp. ' + (Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
@@ -721,7 +749,6 @@
         let DT_TRANSAKSI, DT_INVENTARIS;
 
         $(function() {
-            // Data Transaksi (group per no_transaksi)
             DT_TRANSAKSI = $('#tblTransaksi').DataTable({
                 ajax: "{{ route('inventaris.dt.transaksi') }}",
                 paging: true,
@@ -730,7 +757,7 @@
                 lengthChange: false,
                 pageLength: 10,
                 ordering: false,
-                columns: [{ // No
+                columns: [{
                         data: null,
                         render: (d, t, r, meta) => meta.row + 1,
                         className: 'text-center',
@@ -782,7 +809,6 @@
                 }
             });
 
-            // Inventaris (semua baris jenis_transaksi=2)
             DT_INVENTARIS = $('#tblInventaris').DataTable({
                 ajax: "{{ route('inventaris.dt.inventaris') }}",
                 paging: true,
@@ -837,11 +863,25 @@
                 }
             });
 
-            // CHANGES: refresh saat ganti tab (opsional)
             $('a[data-toggle="tab"][href="#tabTransaksi"]').on('shown.bs.tab', () => DT_TRANSAKSI.ajax.reload(null,
                 false));
             $('a[data-toggle="tab"][href="#tabInventaris"]').on('shown.bs.tab', () => DT_INVENTARIS.ajax.reload(
                 null, false));
+        });
+    </script>
+
+    <script>
+        $(document).on('change', '#party_id', function() {
+            const mode = $('#tipe_transaksi').val();
+            const pemasokId = $(this).val();
+
+            if (mode === 'Inventaris') {
+                loadBarang('Inventaris', pemasokId || null);
+            } else {
+                if (!BARANG.length) {
+                    loadBarang('Penjualan', null);
+                }
+            }
         });
     </script>
 @endpush

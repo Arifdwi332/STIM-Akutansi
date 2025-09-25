@@ -8,6 +8,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use App\Models\PelangganModel;
 use App\Models\PemasokModel;
+use App\Models\MstAkunModel;
+
 use App\Http\Controllers\JsonResponse;
 use App\Models\DatBarangModel;
 use Carbon\Carbon;  
@@ -65,7 +67,7 @@ class InventarisController extends Controller
         ]);
     }
 
-     public function storePemasok(Request $request)
+    public function storePemasok(Request $request)
     {
         $rules = [
             'nama_pemasok' => 'required|string|max:150',
@@ -73,6 +75,10 @@ class InventarisController extends Controller
             'no_hp'        => 'nullable|string|max:30',
             'email'        => 'nullable|email|max:150',
             'npwp'         => 'nullable|string|max:50',
+            'nama_barang'  => 'required|string|max:150',
+            'satuan_ukur'  => 'required|string|max:50',
+            'harga_satuan' => 'required|numeric|min:0', 
+            'harga_jual'   => 'required|numeric|min:0',
         ];
 
         $v = Validator::make($request->all(), $rules);
@@ -83,7 +89,12 @@ class InventarisController extends Controller
             ], 422);
         }
 
-        $row = PemasokModel::create([
+        $lastPemasok = PemasokModel::orderBy('id_pemasok', 'desc')->first();
+        $nextNumber = $lastPemasok ? ((int)substr($lastPemasok->kode_pemasok, 3)) + 1 : 1;
+        $kodePemasok = 'SUP' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+        $pemasok = PemasokModel::create([
+            'kode_pemasok' => $kodePemasok,
             'nama_pemasok' => $request->nama_pemasok,
             'alamat'       => $request->alamat,
             'no_hp'        => $request->no_hp,
@@ -92,11 +103,27 @@ class InventarisController extends Controller
             'saldo_utang'  => 0,
         ]);
 
+        $barang = DatBarangModel::create([
+            'kode_pemasok' => $pemasok->kode_pemasok, 
+            'nama_barang'  => $request->nama_barang,
+            'satuan_ukur'  => $request->satuan_ukur,
+            'hpp'          => $request->harga_satuan,
+            'harga_jual'   => $request->harga_jual,
+            'stok_awal'    => 0,
+            'stok_akhir'   => 0,
+        ]);
+
         return response()->json([
             'ok'   => true,
-            'data' => $row,
+            'data' => [
+                'pemasok' => $pemasok,
+                'barang'  => $barang,
+            ],
         ]);
     }
+
+
+
    public function getParties(Request $request)
     {
         $tipe = $request->query('tipe');  
@@ -112,18 +139,199 @@ class InventarisController extends Controller
    public function barangList()
     {
         $rows = DatBarangModel::query()
-            ->select('id_barang as id','nama_barang as nama','satuan_ukur','harga_jual','hpp')
+            ->select('id_barang as id','nama_barang as nama','satuan_ukur','harga_jual','hpp','harga_satuan')
             ->orderBy('nama_barang')
             ->get();
 
         return response()->json(['ok' => true, 'data' => $rows]);
     }
 
+ private function insertJurnalTunaiPenjualan(string $noTransaksi, float $totalItem, int $jenisCode, int $tipePembayaran): void
+{
+    // ======================
+    // CASE 1: Penjualan (1) + Tunai (1)
+    // ======================
+    if ($jenisCode === 1 && $tipePembayaran === 1) {
+        $rows = [
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 101,
+                'nama_akun'     => 'null',
+                'jml_debit'     => (float) $totalItem,
+                'jml_kredit'    => 0,
+                'jenis_laporan' => 1,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 102,
+                'nama_akun'     => 'null',
+                'jml_debit'     => 0,
+                'jml_kredit'    => (float) $totalItem,
+                'jenis_laporan' => 1,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+        ];
+
+        DB::table('dat_detail_transaksi')->insert($rows);
+
+        foreach ($rows as $r) {
+            $affected = 0;
+            if ($r['jml_debit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->increment('saldo_berjalan', (float) $r['jml_debit']);
+            } elseif ($r['jml_kredit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->decrement('saldo_berjalan', (float) $r['jml_kredit']);
+            }
+            if ($affected === 0) {
+                throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
+            }
+        }
+    }
+
+    // ======================
+    // CASE 2: Penjualan (1) + Kredit (2)
+    // ======================
+    if ($jenisCode === 1 && $tipePembayaran === 2) {
+        $rows = [
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 105,
+                'nama_akun'     => 'null',
+                'jml_debit'     => (float) $totalItem,
+                'jml_kredit'    => 0,
+                'jenis_laporan' => 2, 
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 102,
+                'nama_akun'     => 'null',
+                'jml_debit'     => 0,
+                'jml_kredit'    => (float) $totalItem,
+                'jenis_laporan' => 2,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+        ];
+
+        DB::table('dat_detail_transaksi')->insert($rows);
+
+        foreach ($rows as $r) {
+            $affected = 0;
+            if ($r['jml_debit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->increment('saldo_berjalan', (float) $r['jml_debit']);
+            } elseif ($r['jml_kredit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->decrement('saldo_berjalan', (float) $r['jml_kredit']);
+            }
+            if ($affected === 0) {
+                throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
+            }
+        }
+    }
+
+    // ======================
+    // CASE 3: Inventaris (2) + Tunai (1)
+    // ======================
+    if ($jenisCode === 2 && $tipePembayaran === 1) {
+        $rows = [
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 106,
+                'nama_akun'     => 'null',
+                'jml_debit'     => (float) $totalItem,
+                'jml_kredit'    => 0,
+                'jenis_laporan' => 1,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 101,
+                'nama_akun'     => 'null',
+                'jml_debit'     => 0,
+                'jml_kredit'    => (float) $totalItem,
+                'jenis_laporan' => 2,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+        ];
+
+        DB::table('dat_detail_transaksi')->insert($rows);
+
+        foreach ($rows as $r) {
+            $affected = 0;
+            if ($r['jml_debit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->increment('saldo_berjalan', (float) $r['jml_debit']);
+            } elseif ($r['jml_kredit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->decrement('saldo_berjalan', (float) $r['jml_kredit']);
+            }
+            if ($affected === 0) {
+                throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
+            }
+        }
+    }
+
+    // ======================
+    // CASE 4: Inventaris (2) + Kredit (2)
+    // ======================
+    if ($jenisCode === 2 && $tipePembayaran === 2) {
+        $rows = [
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 106,
+                'nama_akun'     => 'null',
+                'jml_debit'     => (float) $totalItem,
+                'jml_kredit'    => 0,
+                'jenis_laporan' => 1,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+            [
+                'no_transaksi'  => $noTransaksi,
+                'kode_akun'     => 105,
+                'nama_akun'     => 'null',
+                'jml_debit'     => 0,
+                'jml_kredit'    => (float) $totalItem,
+                'jenis_laporan' => 2,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ],
+        ];
+
+        DB::table('dat_detail_transaksi')->insert($rows);
+
+        foreach ($rows as $r) {
+            $affected = 0;
+            if ($r['jml_debit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->increment('saldo_berjalan', (float) $r['jml_debit']);
+            } elseif ($r['jml_kredit'] > 0) {
+                $affected = MstAkunModel::where('kode_akun', $r['kode_akun'])
+                    ->lockForUpdate()->decrement('saldo_berjalan', (float) $r['jml_kredit']);
+            }
+            if ($affected === 0) {
+                throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
+            }
+        }
+    }
+}
+
+
 
 public function store(Request $request)
 {
     $request->validate([
         'tipe'              => ['required', Rule::in(['Penjualan','Inventaris'])],
+        'tipe_pembayaran'    => ['required','integer','in:1,2'],
         'tanggal'           => ['required','string'],
         'pelanggan_id'      => ['nullable','integer'],
         'party_id'          => ['nullable','integer'],
@@ -152,16 +360,17 @@ public function store(Request $request)
     // Normalisasi item
     $items = collect($request->items)->map(function($it){
         $qty   = (float) $it['qty'];
-        $harga = (float) $it['harga'];
+        $hargajual = (float) $it['hargajual'];
         return [
             'barang_id' => (int) $it['barang_id'],
             'qty'       => $qty,
             'satuan'    => $it['satuan'] ?? null,
-            'harga'     => $harga,
-            'total'     => (float) round($qty * $harga),
+            'harga'     => $hargajual,
+            'total'     => (float) round($qty * $hargajual),         
         ];
     });
-
+    $tipePembayaran = (int) $request->input('tipe_pembayaran', 1); 
+    $tipePembayaran = ($tipePembayaran === 2) ? 2 : 1;      
     $subtotal      = (float) $items->sum('total');
     $biayaLain     = (float) ($request->biaya_lain ?? 0);
     $diskonPersen  = (float) ($request->diskon_persen ?? 0);
@@ -171,24 +380,26 @@ public function store(Request $request)
     $pajakNominal  = (float) round($afterDisc * ($pajakPersen / 100));
     $grandTotal    = max(0, $afterDisc + $pajakNominal + $biayaLain);
 
-    $idKontak      = $request->input('party_id', $request->input('pelanggan_id')); // pelanggan/pemasok terpilih
-    $jenisCode     = ($request->tipe === 'Penjualan') ? 1 : 2; // 1=Penjualan, 2=Inventaris
-    $prefix        = $jenisCode === 1 ? 'P' : 'S';
+    $idKontak      = $request->input('party_id', $request->input('pelanggan_id')); 
+    $jenisCode = $request->tipe === 'Penjualan' ? 1 : 2;
+    $prefix    = $jenisCode === 1 ? 'P' : 'S';
 
-    // === CHANGES: generate nomor transaksi bila kosong ===
-    $noTransaksi = $request->no_transaksi;
-    if (!$noTransaksi) {
-        $lastNo = DB::table('dat_transaksi')
-            ->where('no_transaksi', 'like', $prefix.'%')
-            ->orderByDesc('id_transaksi')
-            ->value('no_transaksi');
+    $noTransaksi = trim((string) $request->no_transaksi);
+    $valid = preg_match('/^[PS]\d{7}$/', $noTransaksi);
 
-        $seq = 0;
-        if ($lastNo && preg_match('/\d+$/', $lastNo, $m)) {
-            $seq = (int) $m[0];
-        }
-        $noTransaksi = $prefix . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
+if (!$valid) {
+    $lastNo = DB::table('dat_transaksi')
+        ->where('no_transaksi', 'like', $prefix.'%')
+        ->orderByDesc('id_transaksi')
+        ->value('no_transaksi');
+
+    $seq = 0;
+    if ($lastNo && preg_match('/\d+$/', $lastNo, $m)) {
+        $seq = (int) $m[0];
     }
+    $noTransaksi = $prefix . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
+}
+
 
    DB::beginTransaction();
 try {
@@ -236,7 +447,8 @@ try {
             'id_kontak'         => $idKontak,                 
             'id_barang'         => (int) $it['barang_id'],   
             'id_pajak'          => null,                    
-            'jenis_transaksi'   => (string) $jenisCode,     
+            'jenis_transaksi'   => (string) $jenisCode,    
+            'tipe_pembayaran'    => (int) $tipePembayaran, //metode pembayaran 1 = tunai else ... 
             'no_transaksi'      => $noTransaksi,              
             'tgl'               => $tglSql,
             'jml_barang'        => (float) $it['qty'],
@@ -247,13 +459,16 @@ try {
             'created_at'        => now(),
             'updated_at'        => now(),
         ];
-
         $runningPajak += $pajakItem;
         $runningBiaya += $biayaItem;
     }
 
     DB::table('dat_transaksi')->insert($rows);
+    $this->insertJurnalTunaiPenjualan($noTransaksi, (float) $totalItem, (int) $jenisCode, (int) $tipePembayaran);
 
+    DB::table('dat_barang')
+        ->where('id_barang', (int) $it['barang_id'])
+        ->increment('stok_akhir', (float) $it['qty']);
     DB::commit();
     return response()->json([
         'ok' => true,
@@ -360,5 +575,31 @@ public function datatableInventaris()
 
     return response()->json(['data' => $rows]);
 }
+
+public function getBarangByPemasok(Request $request)
+{
+    $pemasokId = $request->input('pemasok_id');
+
+    $pemasokId = 'SUP' . str_pad($pemasokId, 3, '0', STR_PAD_LEFT);
+
+    $barang = DatBarangModel::where('kode_pemasok', $pemasokId)->get();
+
+    return response()->json([
+        'ok' => true,
+        'data' => $barang
+    ]);
+}
+
+public function getBarangSemua(Request $request)
+{
+    // Tanpa filter & tanpa parameter pencarian
+    $barang = DatBarangModel::orderBy('nama_barang')->get();
+
+    return response()->json([
+        'ok'   => true,
+        'data' => $barang
+    ]);
+}
+
 
 }
