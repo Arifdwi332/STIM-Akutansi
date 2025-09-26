@@ -360,14 +360,14 @@ public function subAkunList(Request $r)
         ], true)) {
 
             $map = [
-                'Bayar Gaji'         =>  [7,  1, 1, 1],
-                'Bayar Listrik'      =>  [8,  1, 1, 1],
-                'Bayar Utang Bank'   => [9,  1, 1, 1],
+                'Bayar Gaji'         =>  [7,  1, 1, 2],
+                'Bayar Listrik'      =>  [8,  1, 1, 2],
+                'Bayar Utang Bank'   => [9,  1, 1, 2],
                 'Beli Peralatan Tunai' =>  [10, 1, 2, 2],
                 'Beli ATK Tunai'     => [11, 1, 2, 2],
                 'Pengambilan Pribadi'     => [12, 1, 2, 2],
                 'Pinjam Uang di Bank'     => [1, 14, 2, 2],
-                'Pendapatan Bunga'     => [1, 15, 1, 1],
+                'Pendapatan Bunga'     => [1, 15, 2, 1],
                 'Setoran Pemilik'     => [1, 16, 2, 2],
             ];
 

@@ -174,7 +174,7 @@
 
 @section('content')
     <div class="container-fluid inv-wrap">
-        <h4 class="page-title">Inventaris</h4>
+        <h4 class="page-title">Data Barang</h4>
 
         {{-- ==================== FORM TRANSAKSI ==================== --}}
         <div class="bb-panel">
@@ -187,7 +187,7 @@
                         <label class="mb-1">Tipe Transaksi</label>
                         <select id="tipe_transaksi" class="form-control">
                             <option value="Penjualan">Penjualan</option>
-                            <option value="Inventaris" selected>Inventaris</option>
+                            <option value="Inventaris" selected>Pembelian</option>
                         </select>
                     </div>
                     <div class="form-group col-md-3">
@@ -337,7 +337,8 @@
                 <ul class="nav nav-pills mb-3" id="invTab" role="tablist">
                     <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#tabTransaksi">Data
                             Transaksi</a></li>
-                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabInventaris">Inventaris</a></li>
+                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabInventaris">Data Barang</a>
+                    </li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tabTransaksi">

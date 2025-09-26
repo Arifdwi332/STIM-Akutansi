@@ -229,7 +229,7 @@
                             <a href="{{ route('inventaris.index') }}"
                                 class="nav-link {{ request()->routeIs('inventaris.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-box-open"></i>
-                                <p>Inventaris</p>
+                                <p>Data Barang</p>
                             </a>
                         </li>
                         <li class="nav-item">
