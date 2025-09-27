@@ -112,12 +112,12 @@
                                     <thead class="thead-light">
                                         <tr>
                                             <th>Nama Akun</th>
-                                            <th class="text-success">Debet</th>
-                                            <th class="text-danger">Kredit</th>
+                                            <th class="text-end">Saldo Akhir</th>
                                         </tr>
                                     </thead>
                                 </table>
                             </div>
+
                             <div class="bb-footline">
                                 <small class="text-muted">Ringkasan saldo akun</small>
                                 <div id="pgBuku"></div>
@@ -175,6 +175,83 @@
             loadLabaRugi();
 
             // ====== NERACA ======
+            // function loadNeraca(page = 1) {
+            //     const q = $('#searchBuku').val() || '';
+            //     const url = "{{ route('laporan_keuangan.get_neraca') }}";
+
+            //     $.getJSON(url, {
+            //         search: q,
+            //         page,
+            //         per_page: 20
+            //     }, function(res) {
+            //         if ($('#tblBuku tbody').length === 0) $('#tblBuku').append('<tbody></tbody>');
+            //         const $body = $('#tblBuku tbody').empty();
+
+            //         const kategoriMap = {
+            //             aset: "ASET",
+            //             liabilitas: "LIABILITAS",
+            //             ekuitas: "EKUITAS"
+            //         };
+
+            //         let totalAset = 0,
+            //             totalLiabilitas = 0,
+            //             totalEkuitas = 0;
+
+            //         Object.keys(kategoriMap).forEach(key => {
+            //             const rows = res.data?.[key] || [];
+            //             if (rows.length === 0) return;
+
+            //             // header kategori (highlight)
+            //             $body.append(`
+        //     <tr class="table-secondary fw-bold">
+        //         <td colspan="2">${kategoriMap[key]}</td>
+        //     </tr>
+        // `);
+
+            //             let subtotal = 0;
+            //             rows.forEach(r => {
+            //                 const namaAkun = r.nama_akun ?? '';
+            //                 const saldo = Number(r.saldo ?? 0);
+            //                 subtotal += saldo;
+
+            //                 $body.append(`
+        //         <tr>
+        //             <td>${namaAkun}</td>
+        //             <td class="text-end">${rp(saldo)}</td>
+        //         </tr>
+        //     `);
+            //             });
+
+            //             if (key === "aset") totalAset = subtotal;
+            //             if (key === "liabilitas") totalLiabilitas = subtotal;
+            //             if (key === "ekuitas") totalEkuitas = subtotal;
+
+            //             // baris total kategori (bold tanpa highlight)
+            //             $body.append(`
+        //     <tr class="fw-bold">
+        //         <td>TOTAL ${kategoriMap[key]}</td>
+        //         <td class="text-end">${rp(subtotal)}</td>
+        //     </tr>
+        // `);
+            //         });
+
+            //         // Tambahkan total Liabilitas + Ekuitas (dibuat bold + highlight khusus)
+            //         if (totalLiabilitas || totalEkuitas) {
+            //             $body.append(`
+        //     <tr class="fw-bold table-dark text-white">
+        //         <td>TOTAL LIABILITAS + EKUITAS</td>
+        //         <td class="text-end">${rp(totalLiabilitas + totalEkuitas)}</td>
+        //     </tr>
+        // `);
+            //         }
+
+            //         $('#pgBuku').text(`Total akun: ${res.total ?? 0} | Hal: ${res.page ?? 1}`);
+            //     }).fail(function(xhr) {
+            //         console.error('loadNeraca error:', xhr?.responseText || xhr.statusText);
+            //     });
+            // }
+
+            // ====== NERACA ======
             function loadNeraca(page = 1) {
                 const q = $('#searchBuku').val() || '';
                 const url = "{{ route('laporan_keuangan.get_neraca') }}";
@@ -187,25 +264,70 @@
                     if ($('#tblBuku tbody').length === 0) $('#tblBuku').append('<tbody></tbody>');
                     const $body = $('#tblBuku tbody').empty();
 
-                    (res.data || []).forEach(r => {
-                        const namaAkun = r.nama_akun ?? r.namaAkun ?? r.nama ?? '';
-                        const debetVal = r.debet ?? r.debit ?? r.jml_debit ?? 0;
-                        const kreditVal = r.kredit ?? r.credit ?? r.jml_kredit ?? 0;
+                    const kategoriMap = {
+                        aset: "ASET",
+                        liabilitas: "LIABILITAS",
+                        ekuitas: "EKUITAS"
+                    };
 
+                    let totalAset = 0,
+                        totalLiabilitas = 0,
+                        totalEkuitas = 0;
+
+                    Object.keys(kategoriMap).forEach(key => {
+                        const rows = res.data?.[key] || [];
+                        if (rows.length === 0) return;
+
+                        // header kategori
                         $body.append(`
-                        <tr>
+                <tr class="table-secondary fw-bold">
+                    <td colspan="2">${kategoriMap[key]}</td>
+                </tr>
+            `);
+
+                        let subtotal = 0;
+                        rows.forEach(r => {
+                            const namaAkun = r.nama_akun ?? '';
+                            let saldo = Number(r.saldo ?? 0);
+
+                            // khusus LIABILITAS → selalu positif
+                            if (key === "liabilitas") {
+                                saldo = Math.abs(saldo);
+                            }
+
+                            subtotal += saldo;
+
+                            $body.append(`
+                    <tr>
                         <td>${namaAkun}</td>
-                        <td class="text-success">${rp(debetVal)}</td>
-                        <td class="text-danger">${rp(kreditVal)}</td>
-                        </tr>
-                    `);
+                        <td class="text-end">${rp(saldo)}</td>
+                    </tr>
+                `);
+                        });
+
+                        if (key === "aset") totalAset = subtotal;
+                        if (key === "liabilitas") totalLiabilitas = subtotal;
+                        if (key === "ekuitas") totalEkuitas = subtotal;
+
+                        // total kategori
+                        $body.append(`
+                <tr class="font-weight-bold text-black">
+                    <td>TOTAL ${kategoriMap[key]}</td>
+                    <td class="text-end">${rp(subtotal)}</td>
+                </tr>
+            `);
                     });
 
-                    $('#pgBuku').text(`Total: ${res.total ?? (res.data?.length || 0)} | Hal: ${res.page ?? 1}`);
+
+
+                    $('#pgBuku').text(`Total akun: ${res.total ?? 0} | Hal: ${res.page ?? 1}`);
                 }).fail(function(xhr) {
                     console.error('loadNeraca error:', xhr?.responseText || xhr.statusText);
                 });
             }
+
+
+
 
             $('#searchBuku').on('input', () => loadNeraca(1));
             loadNeraca();

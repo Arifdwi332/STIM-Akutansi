@@ -205,9 +205,6 @@
                         </div>
                     </div>
                 </div>
-
-
-
                 <nav class="mt-2">
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
@@ -221,7 +218,7 @@
                             <a href="{{ route('buku_besar.index') }}"
                                 class="nav-link {{ request()->routeIs('buku_besar.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-layer-group"></i>
-                                <p>Buku Besar</p>
+                                <p>Setup</p>
                             </a>
                         </li>
 

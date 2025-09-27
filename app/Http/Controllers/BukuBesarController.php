@@ -384,6 +384,13 @@ public function subAkunList(Request $r)
                 (int) $jlD,   
                 (int) $jlK    
             );
+            if (in_array($tipe, ['Bayar Gaji', 'Bayar Listrik', 'Bayar Utang Bank'], true)) {
+            DB::table('mst_akun')
+                ->where('id', 17)
+                ->lockForUpdate()
+                ->decrement('saldo_berjalan', $nominal);
+            }
+
         }
 
 
