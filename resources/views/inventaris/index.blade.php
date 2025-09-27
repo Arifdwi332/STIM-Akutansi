@@ -261,10 +261,10 @@
                                 <td><input type="number" min="0" value="0" class="form-control item-qty"></td>
                                 <td><input type="text" class="form-control item-satuan" readonly placeholder="-"></td>
                                 <td class="text-right">
-                                    <input type="text" class="form-control item-harga" value="0">
+                                    <input type="text" class="form-control item-harga" readonly value="0">
                                 </td>
                                 <td class="text-right">
-                                    <input type="text" class="form-control item-jual" value="0">
+                                    <input type="text" class="form-control item-jual" readonly value="0">
                                 </td>
                                 <td class="text-right">
                                     <input type="text" class="form-control item-subtotal" value="0" readonly>
@@ -288,7 +288,7 @@
                         <div class="form-group row">
                             <label class="col-sm-4 col-form-label">Biaya lainya</label>
                             <div class="col-sm-8">
-                                <input type="text" id="biaya_lain" class="form-control text-right" value="0">
+                                <input type="text" id="biaya_lain" class="form-control text-right rupiah" value="0">
                             </div>
                         </div>
 

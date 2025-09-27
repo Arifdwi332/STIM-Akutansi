@@ -42,7 +42,6 @@
     <link rel="stylesheet" href="{{ asset('lte/plugins/sweetalert2-theme-bootstrap-4/bootstrap-4.min.css') }}">
     {{-- JQuery --}}
     <script src="{{ asset('lte/plugins/jquery/jquery-3.6.0.min.js') }}"></script>
-    <script src="{{ asset('js/helpers.js') }}"></script>
 
 </head>
 <style>
@@ -695,6 +694,8 @@
             console.error("Service workers are not supported.");
         }
     </script>
+    <script src="{{ asset('js/helper.js') }}"></script>
+
     @stack('scripts')
 </body>
 
