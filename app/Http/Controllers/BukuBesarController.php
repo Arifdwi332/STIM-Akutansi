@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use App\Models\MstAkunModel;
+use App\Models\PemasokModel;
+use App\Models\PelangganModel;
 use App\Models\DatAkunModel;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -596,4 +598,25 @@ public function subAkunList(Request $r)
             'total'     => $total,
         ]);
     }
+         public function listPemasok()
+    {
+        $items = PemasokModel::orderBy('kode_pemasok')
+            ->get(['id_pemasok','kode_pemasok','nama_pemasok']);
+
+        return response()->json([
+            'ok'   => true,
+            'data' => $items,
+        ]);
+    }
+         public function listPelanggan()
+    {
+        $items = pelangganModel::orderBy('id_pelanggan')
+            ->get(['id_pelanggan','nama_pelanggan']);
+
+        return response()->json([
+            'ok'   => true,
+            'data' => $items,
+        ]);
+    }
+
 }

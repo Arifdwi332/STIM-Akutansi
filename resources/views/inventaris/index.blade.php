@@ -339,6 +339,10 @@
                             Transaksi</a></li>
                     <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabInventaris">Data Barang</a>
                     </li>
+                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabPemasok">Data Pemasok</a>
+                    </li>
+                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabPelanggan">Data Pelanggan</a>
+                    </li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tabTransaksi">
@@ -385,6 +389,37 @@
                             </table>
                         </div>
                     </div>
+                    <div class="tab-pane fade" id="tabPemasok">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered" id="tblPemasok" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th style="width:60px;">No</th>
+                                        <th>Nama Pemasok</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="tabPelanggan">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered" id="tblPelanggan" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th style="width:60px;">No</th>
+                                        <th>Nama Pelanggan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div> {{-- .tab-content --}}
             </div>
         </div>
@@ -863,10 +898,73 @@
                     zeroRecords: "No matching records found"
                 }
             });
+            DT_PEMASOK = $('#tblPemasok').DataTable({
+                ajax: "{{ route('listPemasok') }}",
+                paging: true,
+                searching: true,
+                info: true,
+                lengthChange: false,
+                pageLength: 10,
+                ordering: false,
+                columns: [{
+                        data: null,
+                        render: (d, t, r, meta) => meta.row + 1,
+                        className: 'text-center',
+                        width: '60px'
+                    },
+                    {
+                        data: 'nama_pemasok'
+                    }, // Nama Barang
 
+                ],
+                language: {
+                    search: "Search:",
+                    paginate: {
+                        previous: "Previous",
+                        next: "Next"
+                    },
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    infoEmpty: "No entries",
+                    zeroRecords: "No matching records found"
+                }
+            });
+            DT_PELANGGAN = $('#tblPelanggan').DataTable({
+                ajax: "{{ route('listPelanggan') }}",
+                paging: true,
+                searching: true,
+                info: true,
+                lengthChange: false,
+                pageLength: 10,
+                ordering: false,
+                columns: [{
+                        data: null,
+                        render: (d, t, r, meta) => meta.row + 1,
+                        className: 'text-center',
+                        width: '60px'
+                    },
+                    {
+                        data: 'nama_pelanggan'
+                    }, // Nama Barang
+
+                ],
+                language: {
+                    search: "Search:",
+                    paginate: {
+                        previous: "Previous",
+                        next: "Next"
+                    },
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    infoEmpty: "No entries",
+                    zeroRecords: "No matching records found"
+                }
+            });
             $('a[data-toggle="tab"][href="#tabTransaksi"]').on('shown.bs.tab', () => DT_TRANSAKSI.ajax.reload(null,
                 false));
             $('a[data-toggle="tab"][href="#tabInventaris"]').on('shown.bs.tab', () => DT_INVENTARIS.ajax.reload(
+                null, false));
+            $('a[data-toggle="tab"][href="#tabPemasok"]').on('shown.bs.tab', () => DT_PEMASOK.ajax.reload(
+                null, false));
+            $('a[data-toggle="tab"][href="#tabPelanggan"]').on('shown.bs.tab', () => DT_PELANGGAN.ajax.reload(
                 null, false));
         });
     </script>

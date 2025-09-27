@@ -39,6 +39,8 @@ Route::post('/buku_besar/storetransaksi', [BukuBesarController::class, 'storetra
 
 Route::get('buku_besar/get_jurnal',     [BukuBesarController::class, 'getJurnal'])->name('getJurnal');
 Route::get('buku_besar/get_buku_besar', [BukuBesarController::class, 'getBukuBesar'])->name('getBukuBesar');
+Route::get('buku_besar/list_pemasok', [BukuBesarController::class, 'listPemasok'])->name('listPemasok');
+Route::get('buku_besar/list_pelanggan', [BukuBesarController::class, 'listPelanggan'])->name('listPelanggan');
 
 
 
