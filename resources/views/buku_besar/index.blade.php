@@ -321,7 +321,8 @@
                             </div>
                             <div class="form-group col-md-6">
                                 <label>Nominal</label>
-                                <input type="text" class="form-control" id="trx_nominal" placeholder="Rp. xx,xxx,xxx">
+                                <input type="text" class="form-control rupiah" id="trx_nominal"
+                                    placeholder="Rp. xx,xxx,xxx">
                             </div>
                         </div>
 

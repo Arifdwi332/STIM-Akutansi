@@ -304,13 +304,19 @@
                             <label class="col-sm-4 col-form-label">Pajak</label>
                             <div class="col-sm-8">
                                 <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" id="apply_pajak" checked>
+                                        </div>
+                                    </div>
                                     <div class="input-group-prepend"><span class="input-group-text">11%</span></div>
                                     <input type="text" id="pajak_nominal" class="form-control text-right"
                                         value="0" readonly>
                                 </div>
-                                <small class="text-muted">PPN 11% dihitung otomatis</small>
+                                <small class="text-muted">PPN 11% dihitung otomatis jika dicentang</small>
                             </div>
                         </div>
+
 
                         <div class="form-group row">
                             <label class="col-sm-4 col-form-label inv-total-label">Total</label>
@@ -379,7 +385,8 @@
                                         <th>Pemasok</th>
                                         <th style="width:90px;">Stok</th>
                                         <th style="width:100px;">Satuan</th>
-                                        <th style="width:150px;">Total Harga</th>
+                                        <th style="width:150px;">Harga Beli</th>
+                                        <th style="width:150px;">Harga Jual</th>
                                         <th style="width:100px;">Aksi</th>
                                     </tr>
                                 </thead>
@@ -468,27 +475,47 @@
                 $body.find('.item-subtotal').each(function() {
                     sub += toNumber($(this).val());
                 });
+
                 const biaya = toNumber($('#biaya_lain').val());
                 const discP = toNumber($('#diskon_persen').val());
                 const afterDisc = sub - (sub * (discP / 100));
-                const pajak = afterDisc * 0.11;
+
+                let pajak = 0;
+                if ($('#apply_pajak').is(':checked')) {
+                    pajak = afterDisc * 0.11;
+                }
+
                 const grand = afterDisc + pajak + biaya;
+
                 $('#pajak_nominal').val(Math.round(pajak));
                 $('#grand_total').val(fmt(grand));
             }
 
+            $('#biaya_lain,#diskon_persen,#apply_pajak').on('input change', recompute);
+
+
             function hitungSubtotal($tr) {
                 const qty = toNumber($tr.find('.item-qty').val());
-                const hargaJual = toNumber($tr.find('.item-jual').val());
-                const subtotal = qty * hargaJual;
+                const mode = $('#tipe_transaksi').val();
+
+                let harga = 0;
+                if (mode === 'Inventaris') {
+                    harga = toNumber($tr.find('.item-harga').val()); // harga beli
+                } else {
+                    harga = toNumber($tr.find('.item-jual').val()); // harga jual
+                }
+
+                const subtotal = qty * harga;
                 $tr.find('.item-subtotal').val(subtotal);
             }
 
+
             function bindRow($tr) {
-                $tr.on('input', '.item-qty,.item-jual', () => {
+                $tr.on('input', '.item-qty,.item-jual,.item-harga', () => {
                     hitungSubtotal($tr);
                     recompute();
                 });
+
 
                 $tr.find('.inv-del').on('click', function() {
                     if ($body.find('tr').length <= 1) return;
@@ -875,6 +902,12 @@
                         data: 'satuan',
                         width: '100px'
                     }, // Satuan
+                    {
+                        data: 'harga_satuan',
+                        className: 'text-right',
+                        width: '150px',
+                        render: (v) => toRp(v)
+                    },
                     {
                         data: 'total',
                         className: 'text-right',

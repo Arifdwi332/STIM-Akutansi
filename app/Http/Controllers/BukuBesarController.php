@@ -267,6 +267,13 @@ public function subAkunList(Request $r)
         DB::beginTransaction();
         try {
             if ($tipe === 'Manual') {
+                //validasi kas tidak boleh minus
+                 if ($akunK == 1) {
+                    $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
+                    if ($saldoKas < $nominal) {
+                        throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi ini.");
+                    }
+                }
                 // 1) Header jurnal
                 $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
                     'tgl_transaksi' => $tanggal,
@@ -375,6 +382,13 @@ public function subAkunList(Request $r)
 
             [$akunD, $akunK, $jlD, $jlK] = $map[$tipe];
 
+            //validasi akun kas tidak boleh minus
+             if ($akunK == 1) {
+                $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
+                if ($saldoKas < $nominal) {
+                    throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
+                }
+            }
             $this->insertJurnalSimple(
                 $tanggal,
                 (float)$nominal,

@@ -107,12 +107,12 @@ class InventarisController extends Controller
             'kode_pemasok' => $pemasok->kode_pemasok, 
             'nama_barang'  => $request->nama_barang,
             'satuan_ukur'  => $request->satuan_ukur,
-            'hpp'          => $request->harga_satuan,
+            'harga_satuan' => $request->harga_satuan,
             'harga_jual'   => $request->harga_jual,
             'stok_awal'    => 0,
             'stok_akhir'   => 0,
         ]);
-
+// dd($barang);    
         return response()->json([
             'ok'   => true,
             'data' => [
@@ -151,6 +151,8 @@ class InventarisController extends Controller
     // ======================
     // CASE 1: Penjualan (1) + Tunai (1)
     // ======================
+
+    
     if ($jenisCode === 1 && $tipePembayaran === 1) {
         $rows = [
             [
@@ -461,14 +463,30 @@ try {
         ];
         $runningPajak += $pajakItem;
         $runningBiaya += $biayaItem;
+        if ($jenisCode === 1) {
+            $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])
+                ->lockForUpdate()
+                ->first();
+
+            if (!$barang) {
+                throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
+            }
+
+            if ($barang->stok_akhir < $it['qty']) {
+                throw new \RuntimeException("Stok barang {$barang->nama_barang} tidak mencukupi. 
+                    Stok tersedia: {$barang->stok_akhir}, diminta: {$it['qty']}");
+            }
+
+            $barang->decrement('stok_akhir', (float) $it['qty']);
+        }
+
+       
     }
 
     DB::table('dat_transaksi')->insert($rows);
-    $this->insertJurnalTunaiPenjualan($noTransaksi, (float) $totalItem, (int) $jenisCode, (int) $tipePembayaran);
+    $this->insertJurnalTunaiPenjualan($noTransaksi, (float) $grandTotal, (int) $jenisCode, (int) $tipePembayaran);
 
-    DB::table('dat_barang')
-        ->where('id_barang', (int) $it['barang_id'])
-        ->increment('stok_akhir', (float) $it['qty']);
+   
     DB::commit();
     return response()->json([
         'ok' => true,
@@ -541,35 +559,28 @@ public function datatableTransaksi()
     return response()->json(['data' => $rows]);
 }
 
-// CHANGES: Data untuk tab "Inventaris" (jenis_transaksi = 2)
 public function datatableInventaris()
 {
-    $rows = DB::table('dat_transaksi as t')
-        ->leftJoin('dat_barang as b', 'b.id_barang', '=', 't.id_barang')
-        ->leftJoin('dat_pemasok as ps', function($j){
-            $j->on('ps.id_pemasok', '=', 't.id_kontak')
-              ->where('t.jenis_transaksi', '=', 2);
-        })
-        ->where('t.jenis_transaksi', 2)
+    $rows = DatBarangModel::query()
+        ->leftJoin('dat_pemasok as ps', 'ps.kode_pemasok', '=', 'dat_barang.kode_pemasok')
         ->select([
-            'b.nama_barang',
+            'dat_barang.nama_barang',
             'ps.nama_pemasok',
-            't.jml_barang',
-            'b.satuan_ukur',
-            't.total',
-            't.no_transaksi',
-            't.tgl',
+            'dat_barang.stok_akhir',       
+            'dat_barang.satuan_ukur',
+            'dat_barang.harga_satuan',
+            'dat_barang.harga_jual',   
         ])
-        ->orderByDesc('t.tgl')
-        ->orderByDesc('t.no_transaksi')
+        ->orderBy('dat_barang.updated_at', 'desc')
         ->get()
         ->map(function($r){
             return [
                 'nama_barang'  => $r->nama_barang ?: '-',
                 'pemasok'      => $r->nama_pemasok ?: '-',
-                'stok'         => (float) $r->jml_barang,   // tampilkan qty baris transaksi
+                'stok'         => (float) $r->stok_akhir,
                 'satuan'       => $r->satuan_ukur ?: '-',
-                'total'        => (float) $r->total,
+                'harga_satuan'        => (float) $r->harga_satuan,  
+                'total'        => (float) $r->harga_jual,  
             ];
         });
 
