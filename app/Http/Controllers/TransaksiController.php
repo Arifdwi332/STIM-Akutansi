@@ -14,11 +14,11 @@ use App\Http\Controllers\JsonResponse;
 use App\Models\DatBarangModel;
 use Carbon\Carbon;  
 
-class InventarisController extends Controller
+class TransaksiController extends Controller
 {
     public function index()
     {
-        return view('inventaris.index'); 
+        return view('transaksi.index'); 
     }
   
     public function pelangganList()
@@ -612,5 +612,9 @@ public function getBarangSemua(Request $request)
     ]);
 }
 
+  public function kasbank()
+    {
+        return view('transaksi.kasbank'); 
+    }
 
 }

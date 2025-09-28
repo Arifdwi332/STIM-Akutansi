@@ -145,10 +145,40 @@
         /* teks putih */
     }
 
+    /* submenu aktif */
+
 
     .nav-sidebar .nav-link.active i,
     .nav-sidebar .nav-link i {
         color: inherit !important;
+    }
+
+    /* Submenu default */
+    .nav-sidebar .nav-treeview .nav-link {
+        background-color: #fff !important;
+        /* putih/abu terang default */
+        color: #1E5296 !important;
+        /* biru teks */
+    }
+
+    /* Submenu hover */
+    .nav-sidebar .nav-treeview .nav-link:hover {
+        background-color: rgba(30, 82, 150, 0.08) !important;
+        color: #1E5296 !important;
+    }
+
+    /* Submenu aktif */
+    .nav-sidebar .nav-treeview .nav-link.active {
+        background-color: #f0f0f0 !important;
+        /* abu-abu muda */
+        color: #d48806 !important;
+        /* teks emas */
+    }
+
+    /* Icon bulatan submenu aktif */
+    .nav-sidebar .nav-treeview .nav-link.active i {
+        color: #d48806 !important;
+        /* bulatan emas */
     }
 </style>
 
@@ -222,20 +252,71 @@
                             </a>
                         </li>
 
-                        <li class="nav-item">
-                            <a href="{{ route('inventaris.index') }}"
-                                class="nav-link {{ request()->routeIs('inventaris.*') ? 'active' : '' }}">
+                        <li
+                            class="nav-item has-treeview {{ request()->routeIs('transaksi*') || request()->routeIs('inventaris.*') ? 'menu-open' : '' }}">
+                            <a href="#"
+                                class="nav-link {{ request()->routeIs('transaksi*') || request()->routeIs('inventaris.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-box-open"></i>
-                                <p>Data Barang</p>
+                                <p>
+                                    Transaksi
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
                             </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ route('inventaris.index') }}"
+                                        class="nav-link {{ request()->routeIs('inventaris.index') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Penjualan / Pembelian</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('inventaris.kasbank') }}"
+                                        class="nav-link {{ request()->routeIs('inventaris.kasbank') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Kas & Bank</p>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a href="{{ route('laporan_keuangan.index') }}"
-                                class="nav-link {{ request()->routeIs('laporan_keuangan.*') ? 'active' : '' }}">
+
+                        <li class="nav-item has-treeview {{ request()->routeIs('laporan*') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('laporan*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-coins"></i>
-                                <p>Laporan Keuangan</p>
+                                <p>
+                                    Laporan
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
                             </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ route('laporan_keuangan.index') }}"
+                                        class="nav-link {{ request()->routeIs('laporan_keuangan.index') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Keuangan</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('laporan_keuangan.jurnal') }}"
+                                        class="nav-link {{ request()->routeIs('laporan_keuangan.jurnal') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Jurnal Umum</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('laporan_keuangan.bukbes') }}"
+                                        class="nav-link {{ request()->routeIs('laporan_keuangan.bukbes') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Buku Besar</p>
+                                    </a>
+                                </li>
+
+                            </ul>
                         </li>
+
+
+
+
                         <li class="nav-item">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon fas fa-file-invoice"></i>

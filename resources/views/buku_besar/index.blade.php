@@ -217,7 +217,7 @@
 
         <div class="row g-3 eq-row">
             {{-- Input Saldo Awal --}}
-            <div class="col-lg-6">
+            <div class="col-lg-12">
                 <div class="bb-panel">
                     <div class="bb-head d-flex justify-content-between align-items-center">
                         <span>Input Saldo Awal</span>
@@ -299,136 +299,11 @@
             </div>
 
             {{-- Transaksi --}}
-            <div class="col-lg-6">
-                <div class="bb-panel">
-                    <div class="bb-head">Transaksi</div>
-                    <div class="bb-body">
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label>Tipe Transaksi</label>
-                                <select id="tipe_transaksi" class="custom-select">
-                                    <option value="Bayar Gaji">Bayar Gaji</option>
-                                    <option value="Bayar Listrik">Bayar Listrik</option>
-                                    <option value="Bayar Utang Bank">Bayar Utang Bank</option>
-                                    <option value="Beli Peralatan Tunai">Beli Peralatan Tunai</option>
-                                    <option value="Beli ATK Tunai">Beli ATK Tunai</option>
-                                    <option value="Pengambilan Pribadi">Pengambilan Pribadi</option>
-                                    <option value="Pinjam Uang di Bank">Pinjam Uang di Bank</option>
-                                    <option value="Pendapatan Bunga">Pendapatan Bunga</option>
-                                    <option value="Setoran Pemilik">Setoran Pemilik</option>
-                                    <option value="Manual">Manual</option>
-                                </select>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label>Nominal</label>
-                                <input type="text" class="form-control rupiah" id="trx_nominal"
-                                    placeholder="Rp. xx,xxx,xxx">
-                            </div>
-                        </div>
 
-                        <!-- Akun Debet/Kredit: hanya tampil untuk 'Manual' -->
-                        <div id="rowManualAccounts" class="form-row" style="display:none;">
-                            <div class="form-group col-md-6">
-                                <label>Akun Debet</label>
-                                <select id="akun_debet_id" class="form-control">
-                                    <option value="" disabled selected>Pilih Akun Debet</option>
-                                </select>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label>Akun Kredit</label>
-                                <select id="akun_kredit_id" class="form-control">
-                                    <option value="" disabled selected>Pilih Akun Kredit</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label>Tanggal</label>
-                                <div class="input-group">
-                                    <input type="date" class="form-control" id="trx_tanggal"
-                                        placeholder="xx/xx/xxxx">
-                                </div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label>Keterangan</label>
-                                <textarea id="keterangan" name="keterangan" class="form-control" rows="1" placeholder="Tulis keterangan..."></textarea>
-                            </div>
-                        </div>
-
-                        <div class="text-right">
-                            <button class="btn btn-primary" id="btnSimpanTransaksi">Simpan</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
         </div>
 
-        {{-- ===== Tabel bawah ===== --}}
-        <div class="row g-3 mt-1">
-            <div class="col-lg-6">
-                <div class="bb-panel">
-                    <div class="bb-head">Jurnal Umum</div>
-                    <div class="bb-body">
-                        <div class="bb-tablebox">
-                            <div class="bb-tablebar">
-                                <input id="searchJurnal" type="text" class="form-control" placeholder="Search">
-                            </div>
-                            <div class="table-responsive">
-                                <table id="tblJurnal" class="table table-sm table-hover w-100">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>Tanggal</th>
-                                            <th>Keterangan</th>
-                                            <th>Nama Akun</th>
-                                            <th class="text-success">Debet</th>
-                                            <th class="text-danger">Kredit</th>
-                                            {{-- <th>Tipe</th> --}}
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                            <div class="bb-footline">
-                                <small class="text-muted">Jurnal periode berjalan</small>
-                                <div id="pgJurnal"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div class="col-lg-6">
-                <div class="bb-panel">
-                    <div class="bb-head">Buku Besar</div>
-                    <div class="bb-body">
-                        <div class="bb-tablebox">
-                            <div class="bb-tablebar">
-                                <input id="searchBuku" type="text" class="form-control" placeholder="Search">
-                            </div>
-                            <div class="table-responsive">
-                                <table id="tblBuku" class="table table-sm table-hover w-100">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>Nama Akun</th>
-                                            <th>Tanggal</th>
-                                            <th class="text-success">Debet</th>
-                                            <th class="text-danger">Kredit</th>
-                                            <th>Saldo</th>
-                                            {{-- <th>Tipe</th> --}}
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                            <div class="bb-footline">
-                                <small class="text-muted">Ringkasan saldo akun</small>
-                                <div id="pgBuku"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
     </div>
 @endsection

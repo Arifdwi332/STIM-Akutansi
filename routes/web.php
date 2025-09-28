@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BukuBesarController;
-use App\Http\Controllers\InventarisController;
+use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\LaporanKeuanganController;
 /*
 |--------------------------------------------------------------------------
@@ -45,23 +45,24 @@ Route::get('buku_besar/list_pelanggan', [BukuBesarController::class, 'listPelang
 
 
 Route::prefix('inventaris')->name('inventaris.')->group(function () {
-    Route::get('/',                [InventarisController::class, 'index'])->name('index');
+    Route::get('/',                [TransaksiController::class, 'index'])->name('index');
 
-    Route::get('/barang',          [InventarisController::class, 'barangList'])->name('barang');      
-    Route::get('/pelanggan',       [InventarisController::class, 'pelangganList'])->name('pelanggan');
-    Route::get('/next_no',         [InventarisController::class, 'nextNo'])->name('next_no');         
+    Route::get('/barang',          [TransaksiController::class, 'barangList'])->name('barang');      
+    Route::get('/pelanggan',       [TransaksiController::class, 'pelangganList'])->name('pelanggan');
+    Route::get('/next_no',         [TransaksiController::class, 'nextNo'])->name('next_no');         
 
-    Route::post('/store',          [InventarisController::class, 'store'])->name('store');     
-    Route::post('/pelanggan/store', [InventarisController::class, 'storePelanggan'])->name('pelanggan.store');
-    Route::post('/pemasok/store', [InventarisController::class, 'storePemasok'])->name('pemasok.store');   
-    Route::get('/parties', [InventarisController::class, 'getParties'])->name('parties');
-    Route::get('/barang', [InventarisController::class, 'barangList'])->name('barang');
-    Route::get('/transaksi', [InventarisController::class, 'datatableTransaksi'])
+    Route::post('/store',          [TransaksiController::class, 'store'])->name('store');     
+    Route::post('/pelanggan/store', [TransaksiController::class, 'storePelanggan'])->name('pelanggan.store');
+    Route::post('/pemasok/store', [TransaksiController::class, 'storePemasok'])->name('pemasok.store');   
+    Route::get('/parties', [TransaksiController::class, 'getParties'])->name('parties');
+    Route::get('/barang', [TransaksiController::class, 'barangList'])->name('barang');
+    Route::get('/transaksi', [TransaksiController::class, 'datatableTransaksi'])
     ->name('dt.transaksi');
 
-    Route::get('/inventaris', [InventarisController::class, 'datatableInventaris'])->name('dt.inventaris');
-    Route::get('/barang-by-pemasok', [InventarisController::class, 'getBarangByPemasok'])->name('barangByPemasok');
-    Route::get('/barang-semua', [InventarisController::class, 'getBarangSemua'])->name('barangSemua');
+    Route::get('/inventaris', [TransaksiController::class, 'datatableInventaris'])->name('dt.inventaris');
+    Route::get('/barang-by-pemasok', [TransaksiController::class, 'getBarangByPemasok'])->name('barangByPemasok');
+    Route::get('/barang-semua', [TransaksiController::class, 'getBarangSemua'])->name('barangSemua');
+    Route::get('/kasbank', [TransaksiController::class, 'kasbank'])->name('kasbank');
 });
 
 Route::prefix('laporan_keuangan')->name('laporan_keuangan.')->group(function () {
@@ -69,6 +70,10 @@ Route::prefix('laporan_keuangan')->name('laporan_keuangan.')->group(function () 
     Route::get('/get_laba_rugi', [LaporanKeuanganController::class, 'getLabaRugi'])->name('get_laba_rugi');
 
     Route::get('/get_neraca', [LaporanKeuanganController::class, 'getNeraca'])->name('get_neraca');
+    Route::get('/bukbes', [LaporanKeuanganController::class, 'bukbes'])->name('bukbes');
+    Route::get('/jurnal', [LaporanKeuanganController::class, 'jurnal'])->name('jurnal');
+
+
 });
 
 

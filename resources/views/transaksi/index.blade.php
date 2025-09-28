@@ -170,6 +170,21 @@
             display: none
         }
     }
+
+    .nav-sidebar .nav-link {
+        background: #fff !important;
+        color: #1E5296 !important;
+    }
+
+    .nav-sidebar .nav-link:not(.active):hover {
+        background: #f5f5f5 !important;
+        color: #1E5296 !important;
+    }
+
+    .nav-sidebar .nav-link.active {
+        background: #1E5296 !important;
+        color: #fff !important;
+    }
 </style>
 
 @section('content')
@@ -431,7 +446,7 @@
             </div>
         </div>
     </div>
-    @include('inventaris.modal')
+    @include('transaksi.modal')
 @endsection
 
 @push('scripts')
