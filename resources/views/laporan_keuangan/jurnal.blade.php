@@ -258,7 +258,7 @@
             // ====== BUKU BESAR ======
             function loadBuku(page = 1) {
                 const q = $('#searchBuku').val() || '';
-                $.getJSON('/buku_besar/get_buku_besar', {
+                $.getJSON('/buku_besar/get_jurnal', {
                     search: q,
                     page,
                     per_page: 20
