@@ -86,7 +86,7 @@
                     </div>
                     <div class="form-group mb-3">
                         <label class="mb-1" for="harga_satuan" style="font-weight:600;">Harga Satuan</label>
-                        <input type="number" class="form-control" id="harga_satuan" name="harga_satuan"
+                        <input type="text" class="form-control rupiah" id="harga_satuan" name="harga_satuan"
                             placeholder="Harga Satuan" required>
                     </div>
                     <div class="form-group mb-3">
@@ -96,7 +96,7 @@
                     </div>
                     <div class="form-group mb-3">
                         <label class="mb-1" for="harga_jual" style="font-weight:600;">Harga Jual</label>
-                        <input type="number" class="form-control" id="harga_jual" name="harga_jual"
+                        <input type="number" class="form-control rupiah" id="harga_jual" name="harga_jual"
                             placeholder="Harga Jual" required>
                     </div>
                     <div class="form-group mb-3">
