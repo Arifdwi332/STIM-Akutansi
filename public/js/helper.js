@@ -36,3 +36,14 @@ function initRupiahByClass(classNames) {
 document.addEventListener('DOMContentLoaded', function() {
     initRupiahByClass(['item-harga', 'item-jual', 'rupiah']);
 });
+
+function parseRupiah(str) {
+    return str ? str.replace(/[^0-9]/g, '') : '0';
+}
+
+function parseRupiahbiayalain(str) {
+    if (!str) return 0;
+    let cleaned = str.replace(/[^0-9]/g, '');
+    return parseInt(cleaned, 10) || 0;
+}
+

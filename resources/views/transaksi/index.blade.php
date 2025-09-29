@@ -485,13 +485,15 @@
                 $body.find('tr').each((i, tr) => $(tr).find('td:first').text(i + 1));
             }
 
+
             function recompute() {
                 let sub = 0;
                 $body.find('.item-subtotal').each(function() {
                     sub += toNumber($(this).val());
                 });
 
-                const biaya = toNumber($('#biaya_lain').val());
+                let biaya = parseRupiahbiayalain($('#biaya_lain').val());
+                console.log('Biaya lain (raw):', $('#biaya_lain').val(), ' -> parsed:', biaya);
                 const discP = toNumber($('#diskon_persen').val());
                 const afterDisc = sub - (sub * (discP / 100));
 
@@ -502,9 +504,13 @@
 
                 const grand = afterDisc + pajak + biaya;
 
-                $('#pajak_nominal').val(Math.round(pajak));
+                // output diformat
+                $('#pajak_nominal').val(fmt(pajak));
                 $('#grand_total').val(fmt(grand));
             }
+
+            window.recompute = recompute;
+
 
             $('#biaya_lain,#diskon_persen,#apply_pajak').on('input change', recompute);
 
@@ -583,6 +589,7 @@
                     if (res && res.ok && Array.isArray(res.data)) {
                         BARANG = res.data;
                         hydrateBarangSelects();
+                        if (window.recompute) window.recompute();
                     } else {
                         BARANG = [];
                         hydrateBarangSelects();
@@ -765,9 +772,10 @@
                 tanggal: $('#tgl_transaksi').val(),
                 party_id: $('#party_id').val() || null,
                 tipe_pembayaran: Number($('#tipe_pembayaran').val()),
-                biaya_lain: _num($('#biaya_lain').val()),
+                biaya_lain: parseRupiahbiayalain($('#biaya_lain').val()),
                 diskon_persen: _num($('#diskon_persen').val()),
                 pajak_persen: 11,
+                apply_pajak: $('#apply_pajak').is(':checked') ? 1 : 0,
                 items: items
             };
 
@@ -776,6 +784,7 @@
                     method: 'POST',
                     url: "{{ route('inventaris.store') }}",
                     data: payload,
+
                     dataType: 'json'
                 })
                 .done(function(res) {
@@ -792,8 +801,12 @@
                             $(this).find('.item-harga').val('0');
                             $(this).find('.item-subtotal').val('0');
                         });
+                        $('#biaya_lain').val('Rp. 0');
+                        $('#diskon_persen').val('0');
+                        $('#pajak_nominal').val('Rp. 0');
                         $('#grand_total').val('Rp. 0');
-                        $('#pajak_nominal').val('0');
+                        recompute();
+
                     } else {
                         const msg = (res && res.message) ? res.message : 'Gagal menyimpan';
                         if (window.toastr && toastr.error) toastr.error(msg);

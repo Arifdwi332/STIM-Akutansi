@@ -95,8 +95,8 @@
                             placeholder="Satuan Ukur" required>
                     </div>
                     <div class="form-group mb-3">
-                        <label class="mb-1" for="harga_jual" style="font-weight:600;">Harga Jual</label>
-                        <input type="number" class="form-control rupiah" id="harga_jual" name="harga_jual"
+                        <label class="mb-1" for="harga_jual " style="font-weight:600;">Harga Jual</label>
+                        <input type="text" class="form-control rupiah" id="harga_jual" name="harga_jual"
                             placeholder="Harga Jual" required>
                     </div>
                     <div class="form-group mb-3">
@@ -218,6 +218,11 @@
 
         $('#formPemasokBaru').on('submit', function(e) {
             e.preventDefault();
+
+            $(this).find('.rupiah').each(function() {
+                $(this).val(parseRupiah($(this).val()));
+            });
+
             const $btn = $('#btnSimpanPemasokBaru').prop('disabled', true).text('Menyimpan...');
 
             $.ajax({
