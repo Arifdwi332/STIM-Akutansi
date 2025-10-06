@@ -235,8 +235,8 @@ public function subAkunList(Request $r)
             $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
 
             // kurangi modal sebesar total kas yang ditambahkan
-            $modal->saldo_awal     = (string)($modalAwal - $total);
-            $modal->saldo_berjalan = (string)($modalJalan - $total);
+            $modal->saldo_awal     = (string)($modalAwal + $total);
+            $modal->saldo_berjalan = (string)($modalJalan + $total);
             $modal->save();
         }
         });
