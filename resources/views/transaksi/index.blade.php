@@ -418,6 +418,7 @@
                                     <tr>
                                         <th style="width:60px;">No</th>
                                         <th>Nama Pemasok</th>
+                                        <th>Nama Barang</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -983,6 +984,9 @@
                     },
                     {
                         data: 'nama_pemasok'
+                    }, // Nama Barang
+                    {
+                        data: 'nama_barang'
                     }, // Nama Barang
 
                 ],

@@ -8,6 +8,7 @@ use App\Models\MstAkunModel;
 use App\Models\PemasokModel;
 use App\Models\PelangganModel;
 use App\Models\DatAkunModel;
+use App\Models\DatBarangModel;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -704,10 +705,21 @@ public function storetransaksi(Request $request)
             'total'     => $total,
         ]);
     }
-         public function listPemasok()
+      public function listPemasok()
     {
-        $items = PemasokModel::orderBy('kode_pemasok')
-            ->get(['id_pemasok','kode_pemasok','nama_pemasok']);
+        $tp = (new PemasokModel)->getTable();     
+        $tb = (new DatBarangModel)->getTable();   
+
+        $items = PemasokModel::query()
+            ->from("$tp as p")
+            ->leftJoin("$tb as b", 'b.kode_pemasok', '=', 'p.kode_pemasok')
+            ->orderBy('p.kode_pemasok')
+            ->get([
+                'p.id_pemasok',
+                'p.kode_pemasok',
+                'p.nama_pemasok',
+                'b.nama_barang',
+            ]);
 
         return response()->json([
             'ok'   => true,
