@@ -597,7 +597,7 @@
                     }
                 })
                 .fail(function() {
-                    alert('Gagal memuat data barang.');
+                    // alert('Gagal memuat data barang.');
                 });
         }
     </script>
