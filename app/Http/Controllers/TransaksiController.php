@@ -600,7 +600,6 @@ class TransaksiController extends Controller
 
 public function datatableTransaksi()
 {
-    // agregat per no_transaksi
     $agg = DB::table('dat_transaksi as t')
         ->select(
             't.no_transaksi',
@@ -610,9 +609,9 @@ public function datatableTransaksi()
             DB::raw('SUM(t.jml_barang) as qty'),
             DB::raw('SUM(t.total) as total')
         )
+        ->whereIn('t.jenis_transaksi', [1, 2])
         ->groupBy('t.no_transaksi');
 
-    // bungkus jadi subquery biar gampang join kontak
     $x = DB::query()->fromSub($agg, 'x')
         ->leftJoin('dat_pelanggan as pl', function($j){
             $j->on('pl.id_pelanggan', '=', 'x.id_kontak')
@@ -622,7 +621,6 @@ public function datatableTransaksi()
             $j->on('ps.id_pemasok', '=', 'x.id_kontak')
               ->where('x.jenis_transaksi', '=', 2);
         })
-        // ambil satu nama barang pertama sebagai "deskripsi"
         ->select([
             'x.no_transaksi',
             'x.tgl',
@@ -641,8 +639,7 @@ public function datatableTransaksi()
         ->orderByDesc('x.no_transaksi')
         ->get();
 
-    // siapkan untuk DataTables
-    $rows = $x->map(function($r){
+   $rows = $x->map(function($r){
         return [
             'tgl'           => $r->tgl,
             'tipe_label'    => ((int)$r->jenis_transaksi === 1 ? 'Penjualan' : 'Inventaris'),
@@ -688,7 +685,6 @@ public function getBarangByPemasok(Request $request)
 {
     $pemasokId = $request->input('pemasok_id');
 
-    // Ambil kode_pemasok dari tabel pemasok
     $pemasok = PemasokModel::find($pemasokId);
 
     if (!$pemasok) {
@@ -698,7 +694,6 @@ public function getBarangByPemasok(Request $request)
         ], 404);
     }
 
-    // Query barang berdasarkan kode_pemasok
     $barang = DatBarangModel::where('kode_pemasok', $pemasok->kode_pemasok)->get();
 
     return response()->json([
@@ -711,7 +706,6 @@ public function getBarangByPemasok(Request $request)
 
 public function getBarangSemua(Request $request)
 {
-    // Tanpa filter & tanpa parameter pencarian
     $barang = DatBarangModel::orderBy('nama_barang')->get();
 
     return response()->json([

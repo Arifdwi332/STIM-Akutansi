@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BukuBesarController;
 use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\LaporanKeuanganController;
+use App\Http\Controllers\FakturController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -75,5 +76,21 @@ Route::prefix('laporan_keuangan')->name('laporan_keuangan.')->group(function () 
 
 
 });
+
+
+
+
+
+
+Route::prefix('faktur')->name('faktur.')->group(function () {
+    Route::get('/', [FakturController::class, 'index'])->name('index');
+
+    Route::get('/dt/transaksi', [FakturController::class, 'datatableTransaksi'])->name('dt.transaksi');
+
+    Route::get('/{no}/cetak', [FakturController::class, 'print'])->name('cetak');
+    Route::get('/{no}/export/pdf', [FakturController::class, 'exportPdf'])->name('export.pdf');
+});
+
+
 
 
