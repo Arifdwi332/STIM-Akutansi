@@ -884,9 +884,17 @@
                     },
                     {
                         data: null,
-                        width: '100px',
-                        render: (row) => `<a href="#" class="btn btn-primary btn-sm">Detail</a>`
-                    },
+                        width: '160px',
+                        className: 'text-center',
+                        render: (row) => {
+                            const base = '{{ url('faktur') }}' + '/' + encodeURIComponent(
+                                row.no_transaksi);
+                            return `
+   
+      <a href="${base}/export/pdf" class="btn btn-outline-danger btn-sm">PDF</a>
+    `;
+                        }
+                    }
                 ],
                 language: {
                     search: "Search:",
