@@ -159,84 +159,103 @@ public function subAkunList(Request $r)
 
     return response()->json(['ok' => true, 'data' => $items]);
 }
-  public function storeSaldoAwal(Request $r)
-    {
-        $mstId   = $r->input('mst_akun_id');
-        $subIds  = $r->input('sub_akun_id', []);   
-        $nominal = $r->input('nominal', []);       
+ public function storeSaldoAwal(Request $r)
+{
+    $mstId   = $r->input('mst_akun_id');
+    $subIds  = $r->input('sub_akun_id', []);   
+    $nominal = $r->input('nominal', []);       
 
-        if (!$mstId) {
-            return response()->json(['ok'=>false,'message'=>'Kode akun wajib diisi'], 422);
-        }
-
-        $clean = static function($v){
-            $n = (int) preg_replace('/[^\d\-]/', '', (string)$v);
-            return max(0, $n);
-        };
-
-        $nominal = array_map($clean, $nominal);
-
-        // samakan panjang array (jaga-jaga)
-        $count = min(count($subIds), count($nominal));
-
-        // hitung total
-        $total = 0;
-        for ($i=0; $i<$count; $i++) {
-            $total += $nominal[$i];
-        }
-
-        try {
-            DB::transaction(function () use ($mstId, $subIds, $nominal, $count, $total) {
-                // update saldo induk (tambah ke nilai yg ada)
-                /** @var MstAkunModel $mst */
-                $mst = MstAkunModel::lockForUpdate()->findOrFail($mstId);
-
-                $currAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($mst->saldo_awal ?? '0'));
-                $currJalan = (int) preg_replace('/[^\d\-]/', '', (string)($mst->saldo_berjalan ?? '0'));
-
-                $mst->saldo_awal      = (string)($currAwal + $total);
-                $mst->saldo_berjalan  = (string)($currJalan + $total);
-                $mst->save();
-
-                $bySub = [];
-                for ($i=0; $i<$count; $i++) {
-                    $sid = $subIds[$i] ?? null;
-                    $val = $nominal[$i] ?? 0;
-                    if (!$sid || $val <= 0) continue;
-                    $bySub[$sid] = ($bySub[$sid] ?? 0) + $val;
-                }
-
-                if (!empty($bySub)) {
-                    $subs = DatAkunModel::whereIn('id', array_keys($bySub))
-                            ->lockForUpdate()
-                            ->get();
-
-                    foreach ($subs as $sub) {
-                        $currAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($sub->saldo_awal ?? '0'));
-                        $currJalan = (int) preg_replace('/[^\d\-]/', '', (string)($sub->saldo_berjalan ?? '0'));
-                        $add       = $bySub[$sub->id];
-
-                        $sub->saldo_awal     = (string)($currAwal + $add);
-                        $sub->saldo_berjalan = (string)($currJalan + $add);
-                        $sub->save();
-                    }
-                }
-            });
-
-            return response()->json([
-                'ok'     => true,
-                'message'=> 'Saldo awal berhasil disimpan',
-                'total'  => $total,
-            ]);
-
-        } catch (\Throwable $e) {
-            return response()->json([
-                'ok'      => false,
-                'message' => 'Gagal menyimpan saldo awal',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
+    if (!$mstId) {
+        return response()->json(['ok'=>false,'message'=>'Kode akun wajib diisi'], 422);
     }
+
+    $clean = static function($v){
+        $n = (int) preg_replace('/[^\d\-]/', '', (string)$v);
+        return max(0, $n);
+    };
+
+    $nominal = array_map($clean, $nominal);
+
+    // samakan panjang array (jaga-jaga)
+    $count = min(count($subIds), count($nominal));
+
+    // hitung total
+    $total = 0;
+    for ($i=0; $i<$count; $i++) {
+        $total += $nominal[$i];
+    }
+
+    try {
+        DB::transaction(function () use ($mstId, $subIds, $nominal, $count, $total) {
+            // update saldo induk (tambah ke nilai yg ada)
+            /** @var MstAkunModel $mst */
+            $mst = MstAkunModel::lockForUpdate()->findOrFail($mstId);
+
+            $currAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($mst->saldo_awal ?? '0'));
+            $currJalan = (int) preg_replace('/[^\d\-]/', '', (string)($mst->saldo_berjalan ?? '0'));
+
+            $mst->saldo_awal      = (string)($currAwal + $total);
+            $mst->saldo_berjalan  = (string)($currJalan + $total);
+            $mst->save();
+
+            // distribusi ke sub akun (jika ada)
+            $bySub = [];
+            for ($i=0; $i<$count; $i++) {
+                $sid = $subIds[$i] ?? null;
+                $val = $nominal[$i] ?? 0;
+                if (!$sid || $val <= 0) continue;
+                $bySub[$sid] = ($bySub[$sid] ?? 0) + $val;
+            }
+
+            if (!empty($bySub)) {
+                $subs = DatAkunModel::whereIn('id', array_keys($bySub))
+                        ->lockForUpdate()
+                        ->get();
+
+                foreach ($subs as $sub) {
+                    $currAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($sub->saldo_awal ?? '0'));
+                    $currJalan = (int) preg_replace('/[^\d\-]/', '', (string)($sub->saldo_berjalan ?? '0'));
+                    $add       = $bySub[$sub->id];
+
+                    $sub->saldo_awal     = (string)($currAwal + $add);
+                    $sub->saldo_berjalan = (string)($currJalan + $add);
+                    $sub->save();
+                }
+            }
+
+           $akunKode = (string) ($mst->kode_akun ?? '');
+           if ($akunKode === '101' && $total > 0) {
+
+            /** @var MstAkunModel $modal */
+            $modal = MstAkunModel::where('kode_akun', '116')   // MODAL
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
+            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
+
+            // kurangi modal sebesar total kas yang ditambahkan
+            $modal->saldo_awal     = (string)($modalAwal - $total);
+            $modal->saldo_berjalan = (string)($modalJalan - $total);
+            $modal->save();
+        }
+        });
+
+        return response()->json([
+            'ok'     => true,
+            'message'=> 'Saldo awal berhasil disimpan',
+            'total'  => $total,
+        ]);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'ok'      => false,
+            'message' => 'Gagal menyimpan saldo awal',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+
         
 public function storetransaksi(Request $request)
 {
