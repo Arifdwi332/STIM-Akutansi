@@ -185,7 +185,7 @@
         <h4 class="mb-3">Buku Besar</h4>
 
         {{-- ===== Ringkasan ===== --}}
-        <div class="row g-3 mb-2">
+        {{-- <div class="row g-3 mb-2">
             <div class="col-md-4">
                 <div class="bb-stat">
                     <div class="bb-ico prev"><i class="fas fa-wallet"></i></div>
@@ -213,7 +213,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div> --}}
 
         <div class="row g-3 eq-row">
             {{-- Input Saldo Awal --}}

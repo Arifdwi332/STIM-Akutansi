@@ -225,10 +225,10 @@ public function subAkunList(Request $r)
             }
 
            $akunKode = (string) ($mst->kode_akun ?? '');
-           if ($akunKode === '101' && $total > 0) {
+           if ($akunKode === '1101' && $total > 0) {
 
             /** @var MstAkunModel $modal */
-            $modal = MstAkunModel::where('kode_akun', '116')   // MODAL
+            $modal = MstAkunModel::where('kode_akun', '3101')   // MODAL
                         ->lockForUpdate()
                         ->firstOrFail();
 
@@ -238,6 +238,21 @@ public function subAkunList(Request $r)
             // kurangi modal sebesar total kas yang ditambahkan
             $modal->saldo_awal     = (string)($modalAwal + $total);
             $modal->saldo_berjalan = (string)($modalJalan + $total);
+            $modal->save();
+        }
+         if ($akunKode === '2201' && $total > 0) {
+
+            /** @var MstAkunModel $modal */
+            $modal = MstAkunModel::where('kode_akun', '3101')   // MODAL
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
+            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
+
+            // kurangi modal sebesar total kas yang ditambahkan
+            $modal->saldo_awal     = (string)($modalAwal - $total);
+            $modal->saldo_berjalan = (string)($modalJalan - $total);
             $modal->save();
         }
         });
