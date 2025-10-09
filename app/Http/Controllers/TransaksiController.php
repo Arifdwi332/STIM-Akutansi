@@ -157,7 +157,7 @@ class TransaksiController extends Controller
         $rows = [
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 101,
+                'kode_akun'     => 1101, //kas
                 'nama_akun'     => 'null',
                 'jml_debit'     => (float) $totalItem,
                 'jml_kredit'    => 0,
@@ -167,7 +167,7 @@ class TransaksiController extends Controller
             ],
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 102,
+                'kode_akun'     => 4101,//penjualan
                 'nama_akun'     => 'null',
                 'jml_debit'     => 0,
                 'jml_kredit'    => (float) $totalItem,
@@ -188,8 +188,8 @@ class TransaksiController extends Controller
                     ->increment('saldo_berjalan', (float) $r['jml_debit']);
             } elseif ($r['jml_kredit'] > 0) {
                 // cek dulu kalau kode akun = 101 (kas)
-                if ((int)$r['kode_akun'] === 101) {
-                    $akun = MstAkunModel::where('kode_akun', 101)->lockForUpdate()->first();
+                if ((int)$r['kode_akun'] === 1101) {
+                    $akun = MstAkunModel::where('kode_akun', 1101)->lockForUpdate()->first();
                     if (!$akun) {
                         throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
                     }
@@ -213,9 +213,9 @@ class TransaksiController extends Controller
                 throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
             }
         }
-            $akunSaldo = MstAkunModel::where('kode_akun', 117)->lockForUpdate()->first();
+            $akunSaldo = MstAkunModel::where('kode_akun', 3201)->lockForUpdate()->first();
             if (!$akunSaldo) {
-                throw new \RuntimeException("Kode akun 117 tidak ditemukan di mst_akun.");
+                throw new \RuntimeException("Kode akun 3201 tidak ditemukan di mst_akun.");
             }
             $akunSaldo->increment('saldo_berjalan', (float) $totalItem);
     }
@@ -227,7 +227,7 @@ class TransaksiController extends Controller
         $rows = [
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 118,
+                'kode_akun'     => 1103, //piutang usaha
                 'nama_akun'     => 'null',
                 'jml_debit'     => (float) $totalItem,
                 'jml_kredit'    => 0,
@@ -237,7 +237,7 @@ class TransaksiController extends Controller
             ],
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 102,
+                'kode_akun'     => 4101,//penjualan
                 'nama_akun'     => 'null',
                 'jml_debit'     => 0,
                 'jml_kredit'    => (float) $totalItem,
@@ -257,9 +257,9 @@ class TransaksiController extends Controller
                     ->lockForUpdate()
                     ->increment('saldo_berjalan', (float) $r['jml_debit']);
             } elseif ($r['jml_kredit'] > 0) {
-                // cek dulu kalau kode akun = 101 (kas)
-                if ((int)$r['kode_akun'] === 101) {
-                    $akun = MstAkunModel::where('kode_akun', 101)->lockForUpdate()->first();
+                // cek dulu kalau kode akun = 1101 (kas)
+                if ((int)$r['kode_akun'] === 1101) {
+                    $akun = MstAkunModel::where('kode_akun', 1101)->lockForUpdate()->first();
                     if (!$akun) {
                         throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
                     }
@@ -283,9 +283,9 @@ class TransaksiController extends Controller
                 throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
             }
         }
-            $akunSaldo = MstAkunModel::where('kode_akun', 117)->lockForUpdate()->first();
+            $akunSaldo = MstAkunModel::where('kode_akun', 3201)->lockForUpdate()->first();
             if (!$akunSaldo) {
-                throw new \RuntimeException("Kode akun 117 tidak ditemukan di mst_akun.");
+                throw new \RuntimeException("Kode akun 3201 tidak ditemukan di mst_akun.");
             }
             $akunSaldo->increment('saldo_berjalan', (float) $totalItem);
     }
@@ -297,7 +297,7 @@ class TransaksiController extends Controller
         $rows = [
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 106,
+                'kode_akun'     => 1104,//persediaan
                 'nama_akun'     => 'null',
                 'jml_debit'     => (float) $totalItem,
                 'jml_kredit'    => 0,
@@ -307,7 +307,7 @@ class TransaksiController extends Controller
             ],
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 101,
+                'kode_akun'     => 1101,
                 'nama_akun'     => 'null',
                 'jml_debit'     => 0,
                 'jml_kredit'    => (float) $totalItem,
@@ -328,8 +328,8 @@ class TransaksiController extends Controller
                     ->increment('saldo_berjalan', (float) $r['jml_debit']);
             } elseif ($r['jml_kredit'] > 0) {
                 // cek dulu kalau kode akun = 101 (kas)
-                if ((int)$r['kode_akun'] === 101) {
-                    $akun = MstAkunModel::where('kode_akun', 101)->lockForUpdate()->first();
+                if ((int)$r['kode_akun'] === 1101) {
+                    $akun = MstAkunModel::where('kode_akun', 1101)->lockForUpdate()->first();
                     if (!$akun) {
                         throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
                     }
@@ -363,7 +363,7 @@ class TransaksiController extends Controller
         $rows = [
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 106,
+                'kode_akun'     => 1104,
                 'nama_akun'     => 'null',
                 'jml_debit'     => (float) $totalItem,
                 'jml_kredit'    => 0,
@@ -373,7 +373,7 @@ class TransaksiController extends Controller
             ],
             [
                 'no_transaksi'  => $noTransaksi,
-                'kode_akun'     => 105,
+                'kode_akun'     => 2101,
                 'nama_akun'     => 'null',
                 'jml_debit'     => 0,
                 'jml_kredit'    => (float) $totalItem,
@@ -394,8 +394,8 @@ class TransaksiController extends Controller
                     ->increment('saldo_berjalan', (float) $r['jml_debit']);
             } elseif ($r['jml_kredit'] > 0) {
                 // cek dulu kalau kode akun = 101 (kas)
-                if ((int)$r['kode_akun'] === 101) {
-                    $akun = MstAkunModel::where('kode_akun', 101)->lockForUpdate()->first();
+                if ((int)$r['kode_akun'] === 1101) {
+                    $akun = MstAkunModel::where('kode_akun', 1101)->lockForUpdate()->first();
                     if (!$akun) {
                         throw new \RuntimeException("Kode akun {$r['kode_akun']} tidak ditemukan di mst_akun.");
                     }
