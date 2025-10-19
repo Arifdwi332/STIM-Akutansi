@@ -201,17 +201,55 @@
                     <tr>
                         <td class="c-barang">{{ $it->nama_barang }}</td>
                         <td class="c-qty">{{ number_format($it->qty, 0, ',', '.') }}</td>
-                        <td class="c-harga">{{ $fmt($it->harga_satuan ?? 0) }}</td>
-                        <td class="c-sub">{{ $fmt($it->total ?? 0) }}</td>
+                        <td class="c-harga">{{ $fmt($it->harga_mentah ?? 0) }}</td>
+                        <td class="c-sub">{{ $fmt($it->subtotal ?? 0) }}</td>
+
                     </tr>
                 @endforeach
             </tbody>
             <tfoot>
                 <tr>
+                    <td colspan="3" class="c-harga">SUBTOTAL</td>
+                    <td class="c-sub">{{ $fmt($header->subtotal ?? $items->sum('subtotal')) }}</td>
+                </tr>
+
+                @if (!empty($header->diskon_persen) && $header->diskon_persen > 0)
+                    <tr>
+                        <td colspan="3" class="c-harga">Diskon ({{ $header->diskon_persen }}%)</td>
+                        <td class="c-sub">
+                            -{{ $fmt((($header->subtotal ?? $items->sum('subtotal')) * $header->diskon_persen) / 100) }}
+                        </td>
+                    </tr>
+                @endif
+
+                @if (!empty($header->pajak_nominal) && $header->pajak_nominal > 0)
+                    <tr>
+                        <td colspan="3" class="c-harga">Pajak (11%)</td>
+                        <td class="c-sub">{{ $fmt($header->pajak_nominal) }}</td>
+                    </tr>
+                @endif
+
+                @if (!empty($header->biaya_lain) && $header->biaya_lain > 0)
+                    <tr>
+                        <td colspan="3" class="c-harga">Biaya Lain</td>
+                        <td class="c-sub">{{ $fmt($header->biaya_lain) }}</td>
+                    </tr>
+                @endif
+
+                <tr>
                     <td colspan="3" class="c-harga">TOTAL</td>
-                    <td class="c-sub">{{ $fmt($header->total) }}</td>
+                    <td class="c-sub">
+                        {{ $fmt(
+                            ($header->subtotal ?? $items->sum('subtotal')) -
+                                (($header->subtotal ?? $items->sum('subtotal')) * ($header->diskon_persen ?? 0)) / 100 +
+                                ($header->pajak_nominal ?? 0) +
+                                ($header->biaya_lain ?? 0),
+                        ) }}
+                    </td>
                 </tr>
             </tfoot>
+
+
         </table>
 
         <div class="rule"></div>

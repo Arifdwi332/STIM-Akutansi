@@ -153,18 +153,22 @@ class FakturController extends Controller
     // ================== Common data ==================
     private function getInvoiceData(string $no): ?array
     {
-        $header = DB::table('dat_transaksi as t')
-            ->select(
-                't.no_transaksi',
-                DB::raw('MIN(t.tgl) as tgl'),
-                DB::raw('MAX(t.jenis_transaksi) as jenis_transaksi'),
-                DB::raw('MAX(t.id_kontak) as id_kontak'),
-                DB::raw('SUM(t.jml_barang) as qty'),
-                DB::raw('SUM(t.total) as total')
-            )
-            ->where('t.no_transaksi', $no)
-            ->groupBy('t.no_transaksi')
-            ->first();
+       $header = DB::table('dat_transaksi as t')
+        ->select(
+            't.no_transaksi',
+            DB::raw('MIN(t.tgl) as tgl'),
+            DB::raw('MAX(t.jenis_transaksi) as jenis_transaksi'),
+            DB::raw('MAX(t.id_kontak) as id_kontak'),
+            DB::raw('MAX(t.diskon) as diskon_persen'),
+            DB::raw('MAX(t.biaya_lain) as biaya_lain'),
+            DB::raw('SUM(t.pajak) as pajak_nominal'),
+            DB::raw('SUM(t.jml_barang) as qty'),
+            DB::raw('SUM(t.total) as total')
+        )
+        ->where('t.no_transaksi', $no)
+        ->groupBy('t.no_transaksi')
+        ->first();
+
 
         if (!$header) return null;
 
@@ -174,7 +178,7 @@ class FakturController extends Controller
 
         $items = DB::table('dat_transaksi as t')
             ->join('dat_barang as b', 'b.id_barang', '=', 't.id_barang')
-            ->select('b.nama_barang','t.jml_barang as qty','t.total')
+            ->select('b.nama_barang','t.jml_barang as qty', 't.harga_mentah','t.subtotal','t.total')
             ->where('t.no_transaksi', $no)
             ->orderBy('t.id_transaksi')
             ->get();

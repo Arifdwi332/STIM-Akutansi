@@ -754,14 +754,17 @@
                 const satuan = ($tr.find('.item-satuan').val() || '').trim() || null;
                 const harga = _num($tr.find('.item-harga').val());
                 const hargajual = _num($tr.find('.item-jual').val());
-
+                const subtotal = _num($tr.find('.item-subtotal').val());
+                const tipeTransaksi = $('#tipe_transaksi').val();
                 if (id && qty > 0) {
                     items.push({
                         barang_id: id,
                         qty: qty,
                         satuan: satuan,
                         harga: harga,
-                        hargajual: hargajual
+                        hargajual: hargajual,
+                        subtotal: subtotal,
+                        harga_mentah: (tipeTransaksi === 'Penjualan') ? hargajual : harga
                     });
                 }
             });

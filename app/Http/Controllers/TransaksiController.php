@@ -443,6 +443,9 @@ class TransaksiController extends Controller
         'items.*.qty'       => ['required','numeric','min:0.0001'],
         'items.*.satuan'    => ['nullable','string','max:50'],
         'items.*.harga'     => ['required','numeric','min:0'],
+        'items.*.subtotal'  => ['nullable','numeric','min:0'],
+        'items.*.harga_mentah' => ['nullable','numeric','min:0'],
+
     ]);
 
     try {
@@ -464,11 +467,18 @@ class TransaksiController extends Controller
             ? (float) $it['hargajual']
             : (float) $it['harga'];
 
+              $hargaMentah = isset($it['harga_mentah'])
+        ? (float) $it['harga_mentah']
+        : $harga;
+
+        $subtotal = (float) round($qty * $harga);       
         return [
             'barang_id' => (int) $it['barang_id'],
             'qty'       => $qty,
             'satuan'    => $it['satuan'] ?? null,
             'harga'     => $harga,
+            'harga_mentah'  => $hargaMentah,
+            'subtotal'  => $subtotal,
             'total'     => (float) round($qty * $harga),
         ];
     });
@@ -544,8 +554,12 @@ class TransaksiController extends Controller
                 'jml_barang'        => (float) $it['qty'],
                 'metode_pembayaran' => null,
                 'hpp'               => 0,
+                'harga_mentah'      => (float) $it['harga_mentah'],
                 'pajak'             => $pajakItem,
+                'subtotal'          => (float) $it['subtotal'],
                 'total'             => $totalItem,
+                'biaya_lain'        => (float) $biayaLain,
+                'diskon'             => (float) $diskonPersen,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ];
