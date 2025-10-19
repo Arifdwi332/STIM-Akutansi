@@ -64,6 +64,8 @@ Route::prefix('inventaris')->name('inventaris.')->group(function () {
     Route::get('/barang-by-pemasok', [TransaksiController::class, 'getBarangByPemasok'])->name('barangByPemasok');
     Route::get('/barang-semua', [TransaksiController::class, 'getBarangSemua'])->name('barangSemua');
     Route::get('/kasbank', [TransaksiController::class, 'kasbank'])->name('kasbank');
+    Route::post('/inventaris/update-barang', [TransaksiController::class, 'updateBarang'])->name('updateBarang');
+
 });
 
 Route::prefix('laporan_keuangan')->name('laporan_keuangan.')->group(function () {

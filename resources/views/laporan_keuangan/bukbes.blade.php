@@ -214,48 +214,66 @@
             </div>
         </div>
     </div>
+    <!-- Modal Detail Jurnal -->
+    <div class="modal fade" id="modalDetail" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detail Jurnal</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Keterangan</th>
+                                    <th>Nama Akun</th>
+                                    <th>Debet</th>
+                                    <th>Kredit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tblDetailBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 @push('scripts')
     <script>
         (function() {
-            const rp = n => {
-                n = Number(n || 0);
-                return 'Rp. ' + n.toLocaleString('id-ID');
-            };
+            const rp = n => 'Rp. ' + Number(n || 0).toLocaleString('id-ID');
 
-            // ====== JURNAL UMUM ======
-            function loadJurnal(page = 1) {
-                const q = $('#searchJurnal').val() || '';
+            function loadJurnalDetail(namaAkun) {
+                $('#tblDetailBody').html('<tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>');
                 $.getJSON('/buku_besar/get_jurnal', {
-                    search: q,
-                    page,
-                    per_page: 20
+                    search: namaAkun,
+                    per_page: 100
                 }, function(res) {
-                    if ($('#tblJurnal tbody').length === 0) {
-                        $('#tblJurnal').append('<tbody></tbody>');
+                    const $body = $('#tblDetailBody').empty();
+                    if (res.data.length === 0) {
+                        $body.html(
+                            '<tr><td colspan="5" class="text-center text-muted">Tidak ada data jurnal</td></tr>'
+                        );
+                        return;
                     }
-                    const $body = $('#tblJurnal tbody').empty();
-
-                    (res.data || []).forEach(r => {
-                        $body.append(
-                            `<tr>
+                    res.data.forEach(r => {
+                        $body.append(`
+                    <tr>
                         <td>${r.tanggal ?? ''}</td>
                         <td>${r.keterangan ?? ''}</td>
                         <td>${r.nama_akun ?? ''}</td>
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
-                    </tr>`
-                        );
+                    </tr>
+                `);
                     });
-
-                    $('#pgJurnal').text(`Total: ${res.total} | Hal: ${res.page}`);
                 });
             }
 
-            $('#searchJurnal').on('input', () => loadJurnal(1));
-            loadJurnal();
-
-            // ====== BUKU BESAR ======
             function loadBuku(page = 1) {
                 const q = $('#searchBuku').val() || '';
                 $.getJSON('/buku_besar/get_buku_besar', {
@@ -263,21 +281,28 @@
                     page,
                     per_page: 20
                 }, function(res) {
-                    if ($('#tblBuku tbody').length === 0) {
-                        $('#tblBuku').append('<tbody></tbody>');
-                    }
+                    if ($('#tblBuku tbody').length === 0) $('#tblBuku').append('<tbody></tbody>');
                     const $body = $('#tblBuku tbody').empty();
 
                     (res.data || []).forEach(r => {
-                        $body.append(
-                            `<tr>
+                        const row = $(`
+                    <tr class="clickable-row" style="cursor:pointer" data-akun="${r.nama_akun}">
                         <td>${r.nama_akun ?? ''}</td>
                         <td>${r.tanggal ?? ''}</td>
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
                         <td>${rp(r.saldo)}</td>
-                    </tr>`
-                        );
+                    </tr>
+                `);
+                        $body.append(row);
+                    });
+
+                    // event klik baris buku besar
+                    $('.clickable-row').off('click').on('click', function() {
+                        const akun = $(this).data('akun');
+                        $('#modalDetail .modal-title').text(`Detail - ${akun}`);
+                        loadJurnalDetail(akun);
+                        $('#modalDetail').modal('show');
                     });
 
                     $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);

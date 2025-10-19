@@ -425,76 +425,78 @@ class TransaksiController extends Controller
 
 
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'tipe'              => ['required', Rule::in(['Penjualan','Inventaris'])],
-            'tipe_pembayaran'    => ['required','integer','in:1,2'],
-            'tanggal'           => ['required','string'],
-            'pelanggan_id'      => ['nullable','integer'],
-            'party_id'          => ['nullable','integer'],
-            'no_transaksi'      => ['nullable','string','max:50'],
-            'biaya_lain'        => ['nullable','numeric'],
-            'diskon_persen'     => ['nullable','numeric','min:0','max:100'],
-            'pajak_persen'      => ['nullable','numeric','min:0','max:100'],
-            'apply_pajak' => ['required','boolean'],
-            'items'             => ['required','array','min:1'],
-            'items.*.barang_id' => ['required','integer','exists:dat_barang,id_barang'],
-            'items.*.qty'       => ['required','numeric','min:0.0001'],
-            'items.*.satuan'    => ['nullable','string','max:50'],
-            'items.*.harga'     => ['required','numeric','min:0'],
-        ]);
+   public function store(Request $request)
+{
+    $request->validate([
+        'tipe'              => ['required', Rule::in(['Penjualan','Inventaris'])],
+        'tipe_pembayaran'   => ['required','integer','in:1,2'],
+        'tanggal'           => ['required','string'],
+        'pelanggan_id'      => ['nullable','integer'],
+        'party_id'          => ['nullable','integer'],
+        'no_transaksi'      => ['nullable','string','max:50'],
+        'biaya_lain'        => ['nullable','numeric'],
+        'diskon_persen'     => ['nullable','numeric','min:0','max:100'],
+        'pajak_persen'      => ['nullable','numeric','min:0','max:100'],
+        'apply_pajak'       => ['required','boolean'],
+        'items'             => ['required','array','min:1'],
+        'items.*.barang_id' => ['required','integer','exists:dat_barang,id_barang'],
+        'items.*.qty'       => ['required','numeric','min:0.0001'],
+        'items.*.satuan'    => ['nullable','string','max:50'],
+        'items.*.harga'     => ['required','numeric','min:0'],
+    ]);
 
-        try {
-            if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $request->tanggal)) {
-                $tglSql = Carbon::createFromFormat('d/m/Y', $request->tanggal)->format('Y-m-d');
-            } else {
-                $tglSql = Carbon::parse($request->tanggal)->format('Y-m-d');
-            }
-        } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'Format tanggal tidak valid'], 422);
+    try {
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $request->tanggal)) {
+            $tglSql = Carbon::createFromFormat('d/m/Y', $request->tanggal)->format('Y-m-d');
+        } else {
+            $tglSql = Carbon::parse($request->tanggal)->format('Y-m-d');
         }
-        // Normalisasi item
-       $items = collect($request->items)->map(function($it) use ($request) {
-            $qty = (float) $it['qty'];
+    } catch (\Throwable $e) {
+        return response()->json(['ok' => false, 'message' => 'Format tanggal tidak valid'], 422);
+    }
 
-            if ($request->tipe === 'Penjualan') {
-                $harga = (float) $it['hargajual'];
-            } else { 
-                $harga = (float) $it['harga'];
-            }
+    // ============================
+    // Normalisasi item & subtotal
+    // ============================
+    $items = collect($request->items)->map(function($it) use ($request) {
+        $qty = (float) $it['qty'];
+        $harga = ($request->tipe === 'Penjualan')
+            ? (float) $it['hargajual']
+            : (float) $it['harga'];
 
-            return [
-                'barang_id' => (int) $it['barang_id'],
-                'qty'       => $qty,
-                'satuan'    => $it['satuan'] ?? null,
-                'harga'     => $harga,
-                'total'     => (float) round($qty * $harga),
-            ];
-        });
+        return [
+            'barang_id' => (int) $it['barang_id'],
+            'qty'       => $qty,
+            'satuan'    => $it['satuan'] ?? null,
+            'harga'     => $harga,
+            'total'     => (float) round($qty * $harga),
+        ];
+    });
 
-        $tipePembayaran = (int) $request->input('tipe_pembayaran', 1); 
-        $tipePembayaran = ($tipePembayaran === 2) ? 2 : 1;      
-        $subtotal      = (float) $items->sum('total');
-        $biayaLain     = (float) ($request->biaya_lain ?? 0);
-        $diskonPersen  = (float) ($request->diskon_persen ?? 0);
-        $pajakPersen   = (float) ($request->pajak_persen ?? 11);
+    $tipePembayaran = (int) $request->input('tipe_pembayaran', 1);
+    $tipePembayaran = ($tipePembayaran === 2) ? 2 : 1;
+    $subtotal      = (float) $items->sum('total');
+    $biayaLain     = (float) ($request->biaya_lain ?? 0);
+    $diskonPersen  = (float) ($request->diskon_persen ?? 0);
+    $pajakPersen   = (float) ($request->pajak_persen ?? 11);
+    $afterDisc     = (float) round($subtotal * (1 - ($diskonPersen / 100)));
+    $applyPajak    = $request->boolean('apply_pajak');
+    $pajakNominal  = $applyPajak ? (float) round($afterDisc * ($pajakPersen / 100)) : 0.0;
+    $grandTotal    = max(0, $afterDisc + $pajakNominal + $biayaLain);
 
-        $afterDisc     = (float) round($subtotal * (1 - ($diskonPersen / 100)));
-        $applyPajak = $request->boolean('apply_pajak'); 
-        $pajakNominal = $applyPajak ? (float) round($afterDisc * ($pajakPersen / 100)) : 0.0;        
-        $grandTotal    = max(0, $afterDisc + $pajakNominal + $biayaLain);
+    $idKontak      = $request->input('party_id', $request->input('pelanggan_id'));
+    $jenisCode     = $request->tipe === 'Penjualan' ? 1 : 2;
+    $prefix        = $jenisCode === 1 ? 'P' : 'S';
 
-        $idKontak      = $request->input('party_id', $request->input('pelanggan_id')); 
-        $jenisCode = $request->tipe === 'Penjualan' ? 1 : 2;
-        $prefix    = $jenisCode === 1 ? 'P' : 'S';
-
-        $noTransaksi = trim((string) $request->no_transaksi);
-        $valid = preg_match('/^[PS]\d{7}$/', $noTransaksi);
+    // ============================
+    // Generate Nomor Transaksi
+    // ============================
+    $noTransaksi = trim((string) $request->no_transaksi);
+    $valid = preg_match('/^[PS]\d{7}$/', $noTransaksi);
 
     if (!$valid) {
         $lastNo = DB::table('dat_transaksi')
-            ->where('no_transaksi', 'like', $prefix.'%')
+            ->where('no_transaksi', 'like', $prefix . '%')
             ->orderByDesc('id_transaksi')
             ->value('no_transaksi');
 
@@ -505,38 +507,22 @@ class TransaksiController extends Controller
         $noTransaksi = $prefix . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
     }
 
-
     DB::beginTransaction();
     try {
-        $jenisCode  = ($request->tipe === 'Penjualan') ? 1 : 2; 
-        $prefix     = $jenisCode === 1 ? 'P' : 'S';
-
-        // generate no_transaksi kalau kosong
-        $noTransaksi = $request->no_transaksi;
-        if (!$noTransaksi) {
-            $lastNo = DB::table('dat_transaksi')
-                ->where('no_transaksi', 'like', $prefix.'%')
-                ->orderByDesc('id_transaksi')
-                ->value('no_transaksi');
-
-            $seq = 0;
-            if ($lastNo && preg_match('/\d+$/', $lastNo, $m)) $seq = (int) $m[0];
-            $noTransaksi = $prefix . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
-        }
-
-        // ===== INSERT PER ITEM KE dat_transaksi =====
+        // ============================
+        // Simpan Transaksi & Update Stok
+        // ============================
         $rows = [];
         $runningPajak = 0;
         $runningBiaya = 0;
-        $subtotalSafe = max(1, $subtotal); // hindari bagi nol
+        $subtotalSafe = max(1, $subtotal);
 
         foreach ($items->values() as $idx => $it) {
             $isLast = ($idx === $items->count() - 1);
 
-            $base           = (float) $it['total'];                                // harga*qty per item (sebelum diskon/pajak)
-            $afterDiscItem  = (float) round($base * (1 - ($diskonPersen / 100)));  // diskon per item
-            $share         = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
-
+            $base = (float) $it['total'];
+            $afterDiscItem = (float) round($base * (1 - ($diskonPersen / 100)));
+            $share = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
             $pajakItem = $applyPajak ? (int) round($afterDiscItem * ($pajakPersen / 100)) : 0;
             $biayaItem = (int) round($biayaLain * $share);
 
@@ -548,27 +534,27 @@ class TransaksiController extends Controller
             $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
 
             $rows[] = [
-                'id_kontak'         => $idKontak,                 
-                'id_barang'         => (int) $it['barang_id'],   
-                'id_pajak'          => null,                    
-                'jenis_transaksi'   => (string) $jenisCode,    
-                'tipe_pembayaran'    => (int) $tipePembayaran, //metode pembayaran 1 = tunai else ... 
-                'no_transaksi'      => $noTransaksi,              
+                'id_kontak'         => $idKontak,
+                'id_barang'         => (int) $it['barang_id'],
+                'id_pajak'          => null,
+                'jenis_transaksi'   => (string) $jenisCode,
+                'tipe_pembayaran'   => (int) $tipePembayaran,
+                'no_transaksi'      => $noTransaksi,
                 'tgl'               => $tglSql,
                 'jml_barang'        => (float) $it['qty'],
-                'metode_pembayaran' => null,                      
-                'hpp'               => 0,                       
-                'pajak'             => $pajakItem,              
-                'total'             => $totalItem,              
+                'metode_pembayaran' => null,
+                'hpp'               => 0,
+                'pajak'             => $pajakItem,
+                'total'             => $totalItem,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ];
+
             $runningPajak += $pajakItem;
             $runningBiaya += $biayaItem;
-            $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])
-                ->lockForUpdate()
-                ->first();
 
+            // Update stok
+            $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])->lockForUpdate()->first();
             if (!$barang) {
                 throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
             }
@@ -576,36 +562,149 @@ class TransaksiController extends Controller
             if ($jenisCode === 1) {
                 // Penjualan: stok berkurang
                 if ($barang->stok_akhir < $it['qty']) {
-                    throw new \RuntimeException("Stok barang {$barang->nama_barang} tidak mencukupi. 
-                        Stok tersedia: {$barang->stok_akhir}, diminta: {$it['qty']}");
+                    throw new \RuntimeException("Stok barang {$barang->nama_barang} tidak mencukupi.");
                 }
                 $barang->decrement('stok_akhir', (float) $it['qty']);
             } else {
-                // Pembelian/Inventaris: stok bertambah
+                // Pembelian: stok bertambah
                 $barang->increment('stok_akhir', (float) $it['qty']);
             }
-
-
-        
         }
 
         DB::table('dat_transaksi')->insert($rows);
-        $this->insertJurnalTunaiPenjualan($noTransaksi, (float) $grandTotal, (int) $jenisCode, (int) $tipePembayaran);
 
-    
+        // ============================
+        // Insert ke Jurnal & Buku Besar
+        // ============================
+        $keterangan = $request->tipe === 'Penjualan' ? 'Penjualan Barang' : 'Pembelian Inventaris';
+
+        if ($jenisCode === 1) {
+            // PENJUALAN
+            if ($tipePembayaran === 1) {
+                // Tunai
+                $akunDebet  = 1;   // Kas
+                $akunKredit = 15;  // Pendapatan Penjualan
+            } else {
+                // Kredit
+                $akunDebet  = 5;   // Piutang Usaha
+                $akunKredit = 15;  // Pendapatan Penjualan
+            }
+        } else {
+            // PEMBELIAN (INVENTARIS)
+            if ($tipePembayaran === 1) {
+                // Tunai
+                $akunDebet  = 6;   // Persediaan / Inventaris
+                $akunKredit = 1;   // Kas
+            } else {
+                // Kredit
+                $akunDebet  = 6;   // Persediaan / Inventaris
+                $akunKredit = 5;   // Utang Usaha
+            }
+        }
+
+        // Panggil helper jurnal
+        $this->insertJurnalSimple(
+            $tglSql,
+            (float) $grandTotal,
+            $keterangan,
+            $akunDebet,
+            $akunKredit,
+            1, 1,
+            $noTransaksi,
+            $request->tipe
+        );
+
         DB::commit();
         return response()->json([
             'ok' => true,
-            'message' => 'Transaksi tersimpan',
+            'message' => 'Transaksi tersimpan dan jurnal dibuat',
             'no_transaksi' => $noTransaksi
         ]);
     } catch (\Throwable $e) {
         DB::rollBack();
         return response()->json(['ok' => false, 'message' => $e->getMessage()], 500);
     }
+}
 
+ private function insertJurnalSimple(
+    string $tanggal,
+    float $nominal,
+    ?string $keterangan,
+    int $akunDebet,
+    int $akunKredit,
+    int $jenisLaporanDebet = 1,
+    int $jenisLaporanKredit = 1,
+    string $noReferensi = 'tes',
+    string $modulSumber = 'tes'
+): void {
+    $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
+        'tgl_transaksi' => $tanggal,
+        'no_referensi'  => $noReferensi,
+        'keterangan'    => $keterangan,
+        'modul_sumber'  => $modulSumber,
+        'created_at'    => now(),
+        'updated_at'    => now(),
+    ]);
+
+    DB::table('dat_detail_jurnal')->insert([
+        [
+            'id_jurnal'     => $idJurnal,
+            'id_akun'       => $akunDebet,
+            'jml_debit'     => $nominal,
+            'jml_kredit'    => 0,
+            'jenis_laporan' => $jenisLaporanDebet,
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ],
+        [
+            'id_jurnal'     => $idJurnal,
+            'id_akun'       => $akunKredit,
+            'jml_debit'     => 0,
+            'jml_kredit'    => $nominal,
+            'jenis_laporan' => $jenisLaporanKredit,
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ],
+    ]);
+
+    $periode = Carbon::parse($tanggal)->format('Y-m');
+    foreach ([
+        $akunDebet  => ['debit' => $nominal, 'kredit' => 0],
+        $akunKredit => ['debit' => 0, 'kredit' => $nominal],
+    ] as $akunId => $val) {
+        $bukbes = DB::table('dat_buku_besar')
+            ->where('id_akun', $akunId)
+            ->where('periode', $periode)
+            ->lockForUpdate()
+            ->first();
+
+        if ($bukbes) {
+            DB::table('dat_buku_besar')
+                ->where('id_bukbes', $bukbes->id_bukbes)
+                ->update([
+                    'ttl_debit'   => (float)$bukbes->ttl_debit + (float)$val['debit'],
+                    'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
+                    'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
+                    'updated_at'  => now(),
+                ]);
+        } else {
+            DB::table('dat_buku_besar')->insert([
+                'id_akun'     => $akunId,
+                'periode'     => $periode,
+                'ttl_debit'   => (float)$val['debit'],
+                'ttl_kredit'  => (float)$val['kredit'],
+                'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]);
+        }
     }
 
+    DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()->increment('saldo_berjalan', $nominal);
+    DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
+}
+
+    
 public function datatableTransaksi()
 {
     $agg = DB::table('dat_transaksi as t')
@@ -667,23 +766,34 @@ public function datatableInventaris()
     $rows = DatBarangModel::query()
         ->leftJoin('dat_pemasok as ps', 'ps.kode_pemasok', '=', 'dat_barang.kode_pemasok')
         ->select([
+            'dat_barang.id_barang',
             'dat_barang.nama_barang',
             'ps.nama_pemasok',
             'dat_barang.stok_akhir',       
             'dat_barang.satuan_ukur',
             'dat_barang.harga_satuan',
             'dat_barang.harga_jual',   
+            'dat_barang.created_at',
+            'dat_barang.updated_at',  
         ])
         ->orderBy('dat_barang.updated_at', 'desc')
         ->get()
         ->map(function($r){
             return [
-                'nama_barang'  => $r->nama_barang ?: '-',
-                'pemasok'      => $r->nama_pemasok ?: '-',
-                'stok'         => (float) $r->stok_akhir,
-                'satuan'       => $r->satuan_ukur ?: '-',
-                'harga_satuan'        => (float) $r->harga_satuan,  
-                'total'        => (float) $r->harga_jual,  
+                'id_barang'     => $r->id_barang,
+                'nama_barang'   => $r->nama_barang ?: '-',
+                'pemasok'       => $r->nama_pemasok ?: '-',
+                'stok'          => (float) $r->stok_akhir,
+                'satuan'        => $r->satuan_ukur ?: '-',
+                'harga_satuan'  => (float) $r->harga_satuan,  
+                'total'         => (float) $r->harga_jual,  
+
+                'created_at'    => $r->created_at 
+                                    ? $r->created_at->format('d/m/Y H:i') 
+                                    : null,
+                'updated_at'    => $r->updated_at 
+                                    ? $r->updated_at->format('d/m/Y H:i') 
+                                    : null,
             ];
         });
 
@@ -726,5 +836,23 @@ public function getBarangSemua(Request $request)
     {
         return view('transaksi.kasbank'); 
     }
+
+public function updateBarang(Request $r)
+{
+    $barang = DatBarangModel::find($r->id_barang);
+    if (!$barang) {
+        return response()->json(['ok' => false, 'message' => 'Barang tidak ditemukan']);
+    }
+
+    $barang->update([
+        'nama_barang'   => $r->nama_barang,
+        'satuan_ukur'   => $r->satuan,
+        'harga_satuan'  => (int) preg_replace('/\D/', '', $r->harga_satuan), // pastikan angka bersih
+        'harga_jual'    => (int) preg_replace('/\D/', '', $r->harga_jual),
+    ]);
+
+    return response()->json(['ok' => true, 'message' => 'Data barang berhasil diperbarui']);
+}
+
 
 }

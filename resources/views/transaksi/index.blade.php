@@ -402,6 +402,9 @@
                                         <th style="width:100px;">Satuan</th>
                                         <th style="width:150px;">Harga Beli</th>
                                         <th style="width:150px;">Harga Jual</th>
+
+                                        <th style="width:100px;">Dibuat Pada</th>
+                                        <th style="width:100px;">Diperbarui Pada</th>
                                         <th style="width:100px;">Aksi</th>
                                     </tr>
                                 </thead>
@@ -952,10 +955,46 @@
                         render: (v) => toRp(v)
                     }, // Total Harga
                     {
-                        data: null,
-                        width: '100px',
-                        render: () => `<a href="#" class="btn btn-primary btn-sm">Detail</a>`
+                        data: 'created_at',
+                        title: 'Dibuat',
+                        width: '130px',
+                        className: 'text-center'
                     },
+                    {
+                        data: 'updated_at',
+                        title: 'Diperbarui',
+                        width: '130px',
+                        className: 'text-center'
+                    },
+
+                    {
+                        data: null,
+                        width: '150px',
+                        className: 'text-center',
+                        render: (row) => `
+                        <button class="btn btn-sm btn-info btnDetailBarang" 
+                                data-id="${row.id_barang}"
+                                data-nama="${row.nama_barang}"
+                                data-satuan="${row.satuan}"
+                                data-stok="${row.stok}"
+                                data-hargabeli="${row.harga_satuan}"
+                                data-hargajual="${row.total}"
+                                data-pemasok="${row.pemasok}">
+                            <i class="fas fa-eye"></i> Detail
+                        </button>
+                        <button class="btn btn-sm btn-warning btnEditBarang" 
+                                data-id="${row.id_barang}"
+                                data-nama="${row.nama_barang}"
+                                data-satuan="${row.satuan}"
+                                data-hargabeli="${row.harga_satuan}"
+                                data-hargajual="${row.total}"
+                                data-pemasok="${row.pemasok}">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                    `
+                    }
+
+
                 ],
                 language: {
                     search: "Search:",

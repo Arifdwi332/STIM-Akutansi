@@ -132,6 +132,97 @@
         </form>
     </div>
 </div>
+<!-- Modal Detail Barang -->
+<div class="modal fade" id="modalDetailBarang" tabindex="-1" role="dialog"
+    aria-labelledby="modalDetailBarangLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title mb-0" id="modalDetailBarangLabel">Detail Data Barang</h6>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-bordered mb-0">
+                    <tr>
+                        <th>Nama Barang</th>
+                        <td id="det_nama_barang"></td>
+                    </tr>
+                    <tr>
+                        <th>Pemasok</th>
+                        <td id="det_pemasok"></td>
+                    </tr>
+                    <tr>
+                        <th>Satuan</th>
+                        <td id="det_satuan"></td>
+                    </tr>
+                    <tr>
+                        <th>Stok</th>
+                        <td id="det_stok"></td>
+                    </tr>
+                    <tr>
+                        <th>Harga Beli</th>
+                        <td id="det_harga_beli"></td>
+                    </tr>
+                    <tr>
+                        <th>Harga Jual</th>
+                        <td id="det_harga_jual"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Barang -->
+<div class="modal fade" id="modalEditBarang" tabindex="-1" role="dialog" aria-labelledby="modalEditBarangLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title mb-0" id="modalEditBarangLabel">Edit Data Barang</h6>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditBarang">
+                    <input type="hidden" id="edit_id_barang">
+
+                    <div class="form-group">
+                        <label>Nama Barang</label>
+                        <input type="text" class="form-control" id="edit_nama_barang" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Satuan</label>
+                        <input type="text" class="form-control" id="edit_satuan" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Harga Beli</label>
+                        <input type="text" class="form-control rupiah" id="edit_harga_beli" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Harga Jual</label>
+                        <input type="text" class="form-control rupiah" id="edit_harga_jual" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pemasok</label>
+                        <input type="text" class="form-control" id="edit_pemasok" readonly>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                <button class="btn btn-primary" id="btnUpdateBarang">Simpan</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
     $(function() {
@@ -255,5 +346,60 @@
                     $btn.prop('disabled', false).text('Simpan');
                 });
         });
+    });
+
+    // ==== DETAIL BARANG ====
+    $(document).on('click', '.btnDetailBarang', function() {
+        const data = $(this).data();
+        $('#det_nama_barang').text(data.nama);
+        $('#det_pemasok').text(data.pemasok);
+        $('#det_satuan').text(data.satuan);
+        $('#det_stok').text(data.stok);
+        $('#det_harga_beli').text(toRp(data.hargabeli));
+        $('#det_harga_jual').text(toRp(data.hargajual));
+        $('#modalDetailBarang').modal('show');
+    });
+
+    // ==== EDIT BARANG ====
+    $(document).on('click', '.btnEditBarang', function() {
+        const data = $(this).data();
+        $('#edit_id_barang').val(data.id);
+        $('#edit_nama_barang').val(data.nama);
+        $('#edit_satuan').val(data.satuan);
+        $('#edit_harga_beli').val(data.hargabeli);
+        $('#edit_harga_jual').val(data.hargajual);
+        $('#edit_pemasok').val(data.pemasok);
+        $('#modalEditBarang').modal('show');
+    });
+
+    // Simpan perubahan
+    $(document).on('click', '#btnUpdateBarang', function() {
+        const payload = {
+            id_barang: $('#edit_id_barang').val(),
+            nama_barang: $('#edit_nama_barang').val(),
+            satuan: $('#edit_satuan').val(),
+            harga_satuan: parseRupiah($('#edit_harga_beli').val()), // parse jadi angka
+            harga_jual: parseRupiah($('#edit_harga_jual').val()), // parse jadi angka
+        };
+
+        $.ajax({
+                method: 'POST',
+                url: "{{ route('inventaris.updateBarang') }}",
+                data: payload,
+                dataType: 'json',
+            })
+            .done(res => {
+                if (res.ok) {
+                    $('#modalEditBarang').modal('hide');
+                    toastr.success(res.message || 'Berhasil disimpan');
+                    DT_INVENTARIS.ajax.reload(null, false);
+                } else {
+                    toastr.error(res.message || 'Gagal update');
+                }
+            })
+            .fail(xhr => {
+                const msg = xhr.responseJSON?.message || 'Terjadi kesalahan';
+                toastr.error(msg);
+            });
     });
 </script>
