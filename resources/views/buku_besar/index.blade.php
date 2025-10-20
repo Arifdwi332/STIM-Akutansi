@@ -233,6 +233,9 @@
                             <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalSubAkunBaru">
                                 Daftar Sub Akun
                             </button>
+                            <button class="btn btn-primary text-white" data-toggle="modal" data-target="#modalPemasokBaru">
+                                Tambah Persediaan
+                            </button>
                             @include('buku_besar.daftar_akun_modal')
                         </div>
                     </div>
@@ -357,6 +360,94 @@
         </form>
     </div>
 </div>
+
+<!-- Modal Tambah Persediaan -->
+<div class="modal fade" id="modalPemasokBaru" tabindex="-1" role="dialog" aria-labelledby="modalPemasokBaruLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:520px;">
+        <form id="formPemasokBaru" class="w-100">
+            @csrf
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header">
+                    <h6 class="modal-title mb-0" id="modalPemasokBaruLabel">Daftar Pemasok Baru</h6>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
+                    <div class="form-group">
+
+                        <input type="hidden" class="form-control" id="kode_pemasok" name="kode_pemasok" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="nama_pemasok" style="font-weight:600;">Nama Pemasok</label>
+                        <input type="text" class="form-control" id="nama_pemasok" name="nama_pemasok"
+                            placeholder="Nama Pemasok" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="nama_barang" style="font-weight:600;">Nama Barang</label>
+                        <input type="text" class="form-control" id="nama_barang" name="nama_barang"
+                            placeholder="Nama Barang" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="harga_satuan" style="font-weight:600;">Harga Satuan</label>
+                        <input type="text" class="form-control rupiah" id="harga_satuan" name="harga_satuan"
+                            placeholder="Harga Satuan" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="satuan_ukur" style="font-weight:600;">Satuan Ukur</label>
+                        <input type="text" class="form-control" id="satuan_ukur" name="satuan_ukur"
+                            placeholder="Satuan Ukur" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="harga_jual " style="font-weight:600;">Harga Jual</label>
+                        <input type="text" class="form-control rupiah" id="harga_jual" name="harga_jual"
+                            placeholder="Harga Jual" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="stok " style="font-weight:600;">Stok</label>
+                        <input type="number" class="form-control" id="stok" name="stok" placeholder="Stok"
+                            required>
+
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="alamat_pemasok" style="font-weight:600;">Alamat</label>
+                        <textarea class="form-control" id="alamat_pemasok" name="alamat" rows="3" placeholder="Alamat lengkap"></textarea>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="no_hp_pemasok" style="font-weight:600;">No. HP</label>
+                        <input type="text" class="form-control" id="no_hp_pemasok" name="no_hp"
+                            placeholder="08xxxxxxxxxx">
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="email_pemasok" style="font-weight:600;">Email</label>
+                        <input type="email" class="form-control" id="email_pemasok" name="email"
+                            placeholder="email@domain.com">
+                    </div>
+
+                    <div class="form-group mb-1">
+                        <label class="mb-1" for="npwp_pemasok" style="font-weight:600;">NPWP</label>
+                        <input type="text" class="form-control" id="npwp_pemasok" name="npwp"
+                            placeholder="xx.xxx.xxx.x-xxx.xxx">
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-dismiss="modal">Tutup</button>
+                    <button type="submit" class="btn btn-primary" id="btnSimpanPemasokBaru">Simpan</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 
 @push('scripts')
     <script>
@@ -726,5 +817,54 @@
             $('#searchBuku').on('input', () => loadBuku(1));
             loadBuku();
         })();
+    </script>
+    <script>
+        $('#formPemasokBaru').off('submit').on('submit', function(e) {
+            e.preventDefault();
+
+            $(this).find('.rupiah').each(function() {
+                $(this).val(parseRupiah($(this).val()));
+            });
+
+            const $btn = $('#btnSimpanPemasokBaru').prop('disabled', true).text('Menyimpan...');
+
+            $.ajax({
+                    method: 'POST',
+                    url: "{{ route('storePersediaan') }}",
+                    data: $(this).serialize(),
+                    dataType: 'json'
+                })
+                .done(function(res) {
+                    console.log(res);
+                    if (res && res.ok === true) {
+                        const d = res.data || {};
+                        d.nama = d.nama || d.nama_pemasok;
+
+                        if (typeof appendToSelect === 'function') {
+                            appendToSelect(d, '#pemasok_id, #party_id');
+                        }
+
+                        $('#modalPemasokBaru').modal('hide');
+                        $('#formPemasokBaru')[0].reset();
+                        if (window.toastr) toastr.success('Pemasok berhasil disimpan');
+                        else alert('Pemasok berhasil disimpan');
+                    } else {
+                        const msg = (res && (res.message || res.error)) || 'Gagal menyimpan data';
+                        if (window.toastr) toastr.error(msg);
+                        else alert(msg);
+                    }
+                })
+                .fail(function(xhr) {
+                    let msg = 'Gagal menyimpan data';
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    if (window.toastr) toastr.error(msg);
+                    else alert(msg);
+                })
+                .always(function() {
+                    $btn.prop('disabled', false).text('Simpan');
+                });
+
+            return false;
+        });
     </script>
 @endpush

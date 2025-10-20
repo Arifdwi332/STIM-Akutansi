@@ -11,6 +11,7 @@ use App\Models\DatAkunModel;
 use App\Models\DatBarangModel;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class BukuBesarController extends Controller
 {
@@ -270,6 +271,34 @@ public function subAkunList(Request $r)
             $modal->saldo_berjalan = (string)($modalJalan + $total);
             $modal->save();
         }
+        if ($akunKode === '1103' && $total > 0) {
+
+            /** @var MstAkunModel $modal */
+            $modal = MstAkunModel::where('kode_akun', '3101') // MODAL
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
+            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
+
+            $modal->saldo_awal     = (string)($modalAwal + $total);
+            $modal->saldo_berjalan = (string)($modalJalan + $total);
+            $modal->save();
+        }
+        if ($akunKode === '2101' && $total > 0) {
+            /** @var MstAkunModel $modal */
+            $modal = MstAkunModel::where('kode_akun', '3101')
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
+            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
+
+            // Modal dikurangi sebesar total saldo akun 2101
+            $modal->saldo_awal     = (string)($modalAwal - $total);
+            $modal->saldo_berjalan = (string)($modalJalan - $total);
+            $modal->save();
+        }
         });
 
         return response()->json([
@@ -390,7 +419,7 @@ public function storetransaksi(Request $request)
             // === 4) DETAIL TRANSAKSI ===
             DB::table('dat_detail_transaksi')->insert([
                 [
-                    'no_transaksi' => $noTransaksi, // ✅ gunakan kode transaksi, bukan ID numerik
+                    'no_transaksi' => $noTransaksi, // 
                     'kode_akun'      => $akunD,
                     'nama_akun'      => 'null',
                     'jenis_laporan'  => 'null',
@@ -400,7 +429,7 @@ public function storetransaksi(Request $request)
                     'updated_at'     => now(),
                 ],
                 [
-                    'no_transaksi' => $noTransaksi, // ✅ fix foreign key
+                    'no_transaksi' => $noTransaksi, // 
                     'kode_akun'      => $akunK,
                     'nama_akun'      => 'null',
                     'jenis_laporan'  => 'null',
@@ -416,9 +445,7 @@ public function storetransaksi(Request $request)
             DB::table('mst_akun')->where('id', $akunK)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
         }
 
-        // =========================
-        // Transaksi Otomatis (Bayar Gaji, dsb)
-        // =========================
+        
         elseif (in_array($tipe, [
             'Bayar Gaji',
             'Bayar Listrik',
@@ -445,7 +472,6 @@ public function storetransaksi(Request $request)
 
             [$akunD, $akunK, $jlD, $jlK] = $map[$tipe];
 
-            // validasi kas tidak boleh minus
             if ($akunK == 1) {
                 $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
                 if ($saldoKas < $nominal) {
@@ -453,7 +479,7 @@ public function storetransaksi(Request $request)
                 }
             }
 
-            // === JURNAL SEDERHANA ===
+            
             $this->insertJurnalSimple(
                 $tanggal,
                 (float)$nominal,
@@ -766,5 +792,70 @@ public function storetransaksi(Request $request)
             'data' => $items,
         ]);
     }
+    public function storePemasok(Request $request)
+    {
+        $rules = [
+            'nama_pemasok' => 'required|string|max:150',
+            'alamat'       => 'nullable|string',
+            'no_hp'        => 'nullable|string|max:30',
+            'email'        => 'nullable|email|max:150',
+            'npwp'         => 'nullable|string|max:50',
+            'nama_barang'  => 'required|string|max:150',
+            'satuan_ukur'  => 'required|string|max:50',
+            'harga_satuan' => 'required|numeric|min:0', 
+            'harga_jual'   => 'required|numeric|min:0',
+            'stok'         => 'required|integer|min:0',
+        ];
+
+        $v = Validator::make($request->all(), $rules);
+        if ($v->fails()) {
+            return response()->json([
+                'ok'      => false,
+                'message' => $v->errors()->first(),
+            ], 422);
+        }
+
+        $lastPemasok = PemasokModel::orderBy('id_pemasok', 'desc')->first();
+        $nextNumber = $lastPemasok ? ((int)substr($lastPemasok->kode_pemasok, 3)) + 1 : 1;
+        $kodePemasok = 'SUP' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+        $pemasok = PemasokModel::create([
+            'kode_pemasok' => $kodePemasok,
+            'nama_pemasok' => $request->nama_pemasok,
+            'alamat'       => $request->alamat,
+            'no_hp'        => $request->no_hp,
+            'email'        => $request->email,
+            'npwp'         => $request->npwp,
+            'saldo_utang'  => 0,
+        ]);
+
+       $barang = DatBarangModel::create([
+            'kode_pemasok' => $pemasok->kode_pemasok, 
+            'nama_barang'  => $request->nama_barang,
+            'satuan_ukur'  => $request->satuan_ukur,
+            'harga_satuan' => $request->harga_satuan,
+            'harga_jual'   => $request->harga_jual,
+            'stok_awal'    => (int)$request->stok ?? 0,
+            'stok_akhir'   => (int)$request->stok ?? 0,
+        ]);
+        $nilaiPersediaan = (float)$request->stok * (float)$request->harga_satuan;
+        $akunPersediaan = MstAkunModel::where('kode_akun', '1104')->first();
+
+        if ($akunPersediaan) {
+            $akunPersediaan->saldo_awal += $nilaiPersediaan;
+            $akunPersediaan->saldo_berjalan += $nilaiPersediaan;
+            $akunPersediaan->save();
+         }
+       return response()->json([
+        'ok'   => true,
+        'data' => [
+            'pemasok' => $pemasok,
+            'barang'  => $barang,
+            'update_akun' => $akunPersediaan ? true : false,
+            'nilai_persediaan' => $nilaiPersediaan,
+        ],
+    ]);
+}
+
 
 }
