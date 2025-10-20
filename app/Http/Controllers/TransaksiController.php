@@ -598,6 +598,7 @@ class TransaksiController extends Controller
                 // Tunai
                 $akunDebet  = 1;   // Kas
                 $akunKredit = 15;  // Pendapatan Penjualan
+                $tambahAkun17 = true;
             } else {
                 // Kredit
                 $akunDebet  = 5;   // Piutang Usaha
@@ -623,11 +624,46 @@ class TransaksiController extends Controller
             $keterangan,
             $akunDebet,
             $akunKredit,
-            1, 1,
+            2, 1,
             $noTransaksi,
             $request->tipe
         );
+            if ($tambahAkun17) {
+                $periode = Carbon::parse($tglSql)->format('Y-m');
 
+                // Naikkan saldo berjalan akun 17 (treat sebagai debit)
+                DB::table('mst_akun')
+                    ->where('id', 17)
+                    ->lockForUpdate()
+                    ->increment('saldo_berjalan', (float) $grandTotal);
+
+                // Update / buat buku besar akun 17 (debit)
+                $bb17 = DB::table('dat_buku_besar')
+                    ->where('id_akun', 17)
+                    ->where('periode', $periode)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($bb17) {
+                    DB::table('dat_buku_besar')
+                        ->where('id_bukbes', $bb17->id_bukbes)
+                        ->update([
+                            'ttl_debit'   => (float)$bb17->ttl_debit + (float)$grandTotal,
+                            'saldo_akhir' => (float)$bb17->saldo_akhir + (float)$grandTotal, // model saldo = debit - kredit
+                            'updated_at'  => now(),
+                        ]);
+                } else {
+                    DB::table('dat_buku_besar')->insert([
+                        'id_akun'     => 17,
+                        'periode'     => $periode,
+                        'ttl_debit'   => (float)$grandTotal,
+                        'ttl_kredit'  => 0,
+                        'saldo_akhir' => (float)$grandTotal,
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]);
+                }
+            }
         DB::commit();
         return response()->json([
             'ok' => true,

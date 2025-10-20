@@ -34,6 +34,7 @@ class LaporanKeuanganController extends Controller
             'trx' as sumber,
             COALESCE(a1.nama_akun, CAST(ddt.kode_akun AS CHAR)) as nama_akun,
             a1.kategori_akun as kategori_akun,
+            ddt.kode_akun as kode_akun,
             ddt.jml_debit  as debet,
             ddt.jml_kredit as kredit
         ")
@@ -55,6 +56,7 @@ class LaporanKeuanganController extends Controller
             'jur' as sumber,
             COALESCE(a2.nama_akun, CAST(ddj.id_akun AS CHAR)) as nama_akun,
             a2.kategori_akun as kategori_akun,
+            a2.kode_akun as kode_akun,
             ddj.jml_debit  as debet,
             ddj.jml_kredit as kredit
         ")
@@ -74,26 +76,28 @@ class LaporanKeuanganController extends Controller
             return $r;
         });
 
-    // 🔹 Akumulasi khusus untuk kategori "Beban Penjualan"
-    $bebanPenjualan = $all->where('kategori_akun', 'Beban Penjualan');
-    $sumBeban = null;
-    if ($bebanPenjualan->isNotEmpty()) {
-        $sumBeban = (object)[
+    // 🔹 Akumulasi khusus untuk kode_akun = 6101
+    $akun6101 = $all->where('kode_akun', '6101');
+    $sum6101 = null;
+    if ($akun6101->isNotEmpty()) {
+        $first = $akun6101->first();
+        $sum6101 = (object)[
             'id_row'        => null,
             'sumber'        => 'akumulasi',
-            'nama_akun'     => 'Beban Penjualan',
-            'kategori_akun' => 'Beban Penjualan',
-            'debet'         => $bebanPenjualan->sum('debet'),
-            'kredit'        => $bebanPenjualan->sum('kredit'),
+            'nama_akun'     => $first->nama_akun, // pakai nama asli akun
+            'kategori_akun' => $first->kategori_akun,
+            'kode_akun'     => '6101',
+            'debet'         => $akun6101->sum('debet'),
+            'kredit'        => $akun6101->sum('kredit'),
         ];
     }
 
-    // 🔹 Gabungkan ulang data selain "Beban Penjualan" + hasil akumulasinya
+    // 🔹 Gabungkan ulang data selain kode_akun 6101 + hasil akumulasinya
     $all = $all
-        ->reject(fn($r) => $r->kategori_akun === 'Beban Penjualan')
-        ->when($sumBeban, fn($col) => $col->push($sumBeban))
+        ->reject(fn($r) => $r->kode_akun === '6101')
+        ->when($sum6101, fn($col) => $col->push($sum6101))
         ->sortBy([
-            ['kategori_akun', fn($v) => $v !== 'Pendapatan'], // Pendapatan di atas
+            ['kategori_akun', fn($v) => $v !== 'Pendapatan'],
             ['nama_akun', 'asc']
         ])
         ->values();
@@ -111,6 +115,7 @@ class LaporanKeuanganController extends Controller
         'page'  => $page,
     ]);
 }
+
 
 
 

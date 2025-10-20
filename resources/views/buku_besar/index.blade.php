@@ -226,11 +226,13 @@
                             <button class="btn btn-light border" data-toggle="modal" data-target="#modalListAkun">Lihat
                                 Daftar Akun</button>
 
-                            <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalAkunBaru">
+                            <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalAkunBaru"
+                                hidden>
                                 Daftar Akun
                             </button>
                             @include('buku_besar.daftar_subakun_modal')
-                            <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalSubAkunBaru">
+                            <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalSubAkunBaru"
+                                hidden>
                                 Daftar Sub Akun
                             </button>
                             <button class="btn btn-primary text-white" data-toggle="modal" data-target="#modalPemasokBaru">

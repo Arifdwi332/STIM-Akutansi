@@ -64,6 +64,31 @@
         padding: .55rem .6rem;
         vertical-align: middle;
     }
+
+    #tblJurnal .row-section td {
+        background: #d6d8db;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    #tblJurnal .row-total td {
+        font-weight: 700;
+    }
+
+    #tblJurnal .row-grand td {
+        font-weight: 800;
+    }
+
+    #tblJurnal td,
+    #tblJurnal th {
+        border-top: 1px solid #e5e7eb;
+    }
+
+    #tblJurnal td:last-child,
+    #tblJurnal th:last-child {
+        text-align: right;
+        white-space: nowrap;
+    }
 </style>
 
 @section('content')
@@ -75,28 +100,29 @@
                 <div class="bb-panel">
                     <div class="bb-head">Laba Rugi</div>
                     <div class="bb-body">
-                        <div class="bb-tablebox">
-                            <div class="bb-tablebar">
-                                <input id="searchJurnal" type="text" class="form-control" placeholder="Search">
-                            </div>
-                            <div class="table-responsive">
-                                <table id="tblJurnal" class="table table-sm table-hover w-100">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>Nama Akun</th>
-                                            <th class="text-success">Debet</th>
-                                            <th class="text-danger">Kredit</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                            <div class="bb-footline">
-                                <small class="text-muted">Jurnal periode berjalan</small>
-                                <div id="pgJurnal"></div>
-                            </div>
+                        <div class="bb-tablebar">
+                            <input id="searchJurnal" type="text" class="form-control" placeholder="Search">
+                        </div>
+
+                        <div class="table-responsive">
+                            <table id="tblJurnal" class="table table-sm table-hover w-100">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Keterangan</th>
+                                        <th class="text-end">Nilai</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <div class="bb-footline">
+                            <small class="text-muted">Jurnal periode berjalan</small>
+                            <div id="pgJurnal"></div>
                         </div>
                     </div>
                 </div>
+
             </div>
 
             <div class="col-lg-6">
@@ -145,27 +171,64 @@
                 $.getJSON(url, {
                     search: q,
                     page,
-                    per_page: 20
+                    per_page: 100
                 }, function(res) {
+                    const rows = res?.data || [];
+
+                    // Normalisasi & klasifikasi
+                    const items = rows.map(r => {
+                        const kat = (r.kategori_akun || '').toLowerCase();
+                        const debet = Number(r.debet ?? r.debit ?? r.jml_debit ?? 0);
+                        const kredit = Number(r.kredit ?? r.credit ?? r.jml_kredit ?? 0);
+                        const isPendapatan = kat === 'pendapatan';
+                        const nilai = isPendapatan ? (kredit - debet) : (debet - kredit);
+                        return {
+                            nama: r.nama_akun ?? r.namaAkun ?? r.nama ?? '',
+                            jenis: isPendapatan ? 'pendapatan' : 'beban',
+                            nilai: Math.max(0, nilai)
+                        };
+                    }).filter(i => i.nilai > 0);
+
+                    const pendapatan = items.filter(i => i.jenis === 'pendapatan');
+                    const beban = items.filter(i => i.jenis === 'beban');
+
+                    const totalPendapatan = pendapatan.reduce((s, i) => s + i.nilai, 0);
+                    const totalBeban = beban.reduce((s, i) => s + i.nilai, 0);
+                    const labaRugi = totalPendapatan - totalBeban;
+
+                    // --- render seperti Neraca (tbody berisi bar section + item + total) ---
                     if ($('#tblJurnal tbody').length === 0) $('#tblJurnal').append('<tbody></tbody>');
                     const $body = $('#tblJurnal tbody').empty();
 
-                    (res.data || []).forEach(r => {
-                        const namaAkun = r.nama_akun ?? r.namaAkun ?? r.nama ?? '';
-                        const debetVal = r.debet ?? r.debit ?? r.jml_debit ?? 0;
-                        const kreditVal = r.kredit ?? r.credit ?? r.jml_kredit ?? 0;
+                    // Section: Pendapatan
+                    $body.append(`<tr class="row-section"><td colspan="2">Pendapatan</td></tr>`);
+                    if (pendapatan.length === 0) {
+                        $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                    } else {
+                        pendapatan.forEach(i => {
+                            $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`);
+                        });
+                    }
+                    $body.append(
+                        `<tr class="row-total"><td>Total Pendapatan</td><td>${rp(totalPendapatan)}</td></tr>`
+                    );
 
-                        $body.append(`
-                        <tr>
-                            <td>${namaAkun}</td>
-                            <td class="text-success">${rp(debetVal)}</td>
-                            <td class="text-danger">${rp(kreditVal)}</td>
-                        </tr>
-                        `);
-                    });
+                    // Section: Beban Operasional
+                    $body.append(`<tr class="row-section"><td colspan="2">Beban Operasional</td></tr>`);
+                    if (beban.length === 0) {
+                        $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                    } else {
+                        beban.forEach(i => {
+                            $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`);
+                        });
+                    }
+                    $body.append(`<tr class="row-total"><td>Total Beban</td><td>${rp(totalBeban)}</td></tr>`);
 
-                    $('#pgJurnal').text(
-                        `Total: ${res.total ?? (res.data?.length || 0)} | Hal: ${res.page ?? 1}`);
+                    // Grand total
+                    $body.append(`<tr class="row-grand"><td>Total Laba/Rugi</td><td>${rp(labaRugi)}</td></tr>`);
+
+                    // footer
+                    $('#pgJurnal').text(`Total baris: ${rows.length} | Hal: ${res.page ?? 1}`);
                 }).fail(function(xhr) {
                     console.error('loadLabaRugi error:', xhr?.responseText || xhr.statusText);
                 });
@@ -173,7 +236,6 @@
 
             $('#searchJurnal').on('input', () => loadLabaRugi(1));
             loadLabaRugi();
-
             // ====== NERACA ======
             // function loadNeraca(page = 1) {
             //     const q = $('#searchBuku').val() || '';
