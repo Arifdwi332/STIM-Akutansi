@@ -830,32 +830,43 @@ public function storetransaksi(Request $request)
         ]);
 
        $barang = DatBarangModel::create([
-            'kode_pemasok' => $pemasok->kode_pemasok, 
-            'nama_barang'  => $request->nama_barang,
-            'satuan_ukur'  => $request->satuan_ukur,
-            'harga_satuan' => $request->harga_satuan,
-            'harga_jual'   => $request->harga_jual,
-            'stok_awal'    => (int)$request->stok ?? 0,
-            'stok_akhir'   => (int)$request->stok ?? 0,
-        ]);
-        $nilaiPersediaan = (float)$request->stok * (float)$request->harga_satuan;
-        $akunPersediaan = MstAkunModel::where('kode_akun', '1104')->first();
+        'kode_pemasok' => $pemasok->kode_pemasok, 
+        'nama_barang'  => $request->nama_barang,
+        'satuan_ukur'  => $request->satuan_ukur,
+        'harga_satuan' => $request->harga_satuan,
+        'harga_jual'   => $request->harga_jual,
+        'stok_awal'    => (int)$request->stok ?? 0,
+        'stok_akhir'   => (int)$request->stok ?? 0,
+    ]);
 
-        if ($akunPersediaan) {
-            $akunPersediaan->saldo_awal += $nilaiPersediaan;
-            $akunPersediaan->saldo_berjalan += $nilaiPersediaan;
-            $akunPersediaan->save();
-         }
-       return response()->json([
+    $nilaiPersediaan = (float)$request->stok * (float)$request->harga_satuan;
+
+    $akunPersediaan = MstAkunModel::where('kode_akun', '1104')->first();
+    if ($akunPersediaan) {
+        $akunPersediaan->saldo_awal += $nilaiPersediaan;
+        $akunPersediaan->saldo_berjalan += $nilaiPersediaan;
+        $akunPersediaan->save();
+    }
+
+    $akunModal = MstAkunModel::where('kode_akun', '3101')->first();
+    if ($akunModal) {
+        $akunModal->saldo_awal += $nilaiPersediaan;
+        $akunModal->saldo_berjalan += $nilaiPersediaan;
+        $akunModal->save();
+    }
+
+    return response()->json([
         'ok'   => true,
         'data' => [
-            'pemasok' => $pemasok,
-            'barang'  => $barang,
-            'update_akun' => $akunPersediaan ? true : false,
-            'nilai_persediaan' => $nilaiPersediaan,
+            'pemasok'           => $pemasok,
+            'barang'            => $barang,
+            'update_akun'       => $akunPersediaan ? true : false,
+            'update_modal'      => $akunModal ? true : false, // ✅ [CHANGES]
+            'nilai_persediaan'  => $nilaiPersediaan,
         ],
     ]);
 }
+
 
 
 }
