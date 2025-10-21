@@ -44,6 +44,7 @@ Route::get('buku_besar/list_pemasok', [BukuBesarController::class, 'listPemasok'
 Route::get('buku_besar/list_pelanggan', [BukuBesarController::class, 'listPelanggan'])->name('listPelanggan');
 Route::post('buku_besar/store_pemasok', [BukuBesarController::class, 'storePemasok'])->name('storePersediaan');
 Route::post('/buku-besar/reset-data', [BukuBesarController::class, 'resetData'])->name('buku-besar.reset-data');
+Route::post('/buku-besar/reset-transaksi', [BukuBesarController::class, 'resetTransaksi'])->name('buku-besar.reset-transaksi');
 
 
 

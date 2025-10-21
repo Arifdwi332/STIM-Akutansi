@@ -241,6 +241,10 @@
                             <button class="btn btn-danger text-white" data-toggle="modal" data-target="#modalResetData">
                                 Reset Data
                             </button>
+                            <button class="btn btn-danger text-white" data-toggle="modal"
+                                data-target="#modalResetTransaksi">
+                                Reset Transaksi
+                            </button>
                             @include('buku_besar.daftar_akun_modal')
                         </div>
                     </div>
@@ -475,6 +479,7 @@
                 </div>
             </div>
 
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
                 <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
@@ -482,6 +487,40 @@
         </form>
     </div>
 </div>
+
+<div class="modal fade" id="modalResetTransaksi" tabindex="-1" role="dialog"
+    aria-labelledby="modalResetTransaksiLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form method="POST" action="{{ route('buku-besar.reset-transaksi') }}" class="modal-content"
+            id="formResetTransaksi">
+            @csrf
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalResetTransaksiLabel">Reset Transaksi?</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="alert alert-warning mb-0">
+                    Tindakan ini akan <u>menghapus semua isi</u> tabel:
+                    <code>dat_barang, dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
+                        dat_transaksi</code><br>
+                    dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
+                    menjadi <b>0</b>.
+                    <br><br>Yakin lanjut?
+                </div>
+            </div>
+
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
+                <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 
 {{-- Flash message --}}
 @if (session('status'))
