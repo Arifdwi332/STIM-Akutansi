@@ -603,7 +603,7 @@ class TransaksiController extends Controller
                 // Kredit
                 $akunDebet  = 5;   // Piutang Usaha
                 $akunKredit = 15;  // Pendapatan Penjualan
-                $tambahAkun17 = false;
+                $tambahAkun17 = true;
             }
         } else {
             // PEMBELIAN (INVENTARIS)
