@@ -603,6 +603,7 @@ class TransaksiController extends Controller
                 // Kredit
                 $akunDebet  = 5;   // Piutang Usaha
                 $akunKredit = 15;  // Pendapatan Penjualan
+                $tambahAkun17 = false;
             }
         } else {
             // PEMBELIAN (INVENTARIS)
@@ -610,10 +611,12 @@ class TransaksiController extends Controller
                 // Tunai
                 $akunDebet  = 6;   // Persediaan / Inventaris
                 $akunKredit = 1;   // Kas
+                 $tambahAkun17 = false;
             } else {
                 // Kredit
                 $akunDebet  = 6;   // Persediaan / Inventaris
                 $akunKredit = 5;   // Utang Usaha
+                 $tambahAkun17 = false;
             }
         }
 
@@ -636,33 +639,6 @@ class TransaksiController extends Controller
                     ->where('id', 17)
                     ->lockForUpdate()
                     ->increment('saldo_berjalan', (float) $grandTotal);
-
-                // Update / buat buku besar akun 17 (debit)
-                $bb17 = DB::table('dat_buku_besar')
-                    ->where('id_akun', 17)
-                    ->where('periode', $periode)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($bb17) {
-                    DB::table('dat_buku_besar')
-                        ->where('id_bukbes', $bb17->id_bukbes)
-                        ->update([
-                            'ttl_debit'   => (float)$bb17->ttl_debit + (float)$grandTotal,
-                            'saldo_akhir' => (float)$bb17->saldo_akhir + (float)$grandTotal, // model saldo = debit - kredit
-                            'updated_at'  => now(),
-                        ]);
-                } else {
-                    DB::table('dat_buku_besar')->insert([
-                        'id_akun'     => 17,
-                        'periode'     => $periode,
-                        'ttl_debit'   => (float)$grandTotal,
-                        'ttl_kredit'  => 0,
-                        'saldo_akhir' => (float)$grandTotal,
-                        'created_at'  => now(),
-                        'updated_at'  => now(),
-                    ]);
-                }
             }
         DB::commit();
         return response()->json([
@@ -682,7 +658,7 @@ class TransaksiController extends Controller
     ?string $keterangan,
     int $akunDebet,
     int $akunKredit,
-    int $jenisLaporanDebet = 1,
+    int $jenisLaporanDebet = 2,
     int $jenisLaporanKredit = 1,
     string $noReferensi = 'tes',
     string $modulSumber = 'tes'
