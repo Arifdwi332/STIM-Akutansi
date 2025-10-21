@@ -238,6 +238,9 @@
                             <button class="btn btn-primary text-white" data-toggle="modal" data-target="#modalPemasokBaru">
                                 Tambah Persediaan
                             </button>
+                            <button class="btn btn-danger text-white" data-toggle="modal" data-target="#modalResetData">
+                                Reset Data
+                            </button>
                             @include('buku_besar.daftar_akun_modal')
                         </div>
                     </div>
@@ -449,7 +452,46 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalResetData" tabindex="-1" role="dialog" aria-labelledby="modalResetDataLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form method="POST" action="{{ route('buku-besar.reset-data') }}" class="modal-content" id="formResetData">
+            @csrf
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalResetDataLabel">Reset Data?</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
 
+            <div class="modal-body">
+                <div class="alert alert-warning mb-0">
+                    Tindakan ini akan <u>menghapus semua isi</u> tabel:
+                    <code>dat_barang, dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
+                        dat_pelanggan, dat_pemasok, dat_transaksi</code><br>
+                    dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
+                    menjadi <b>0</b>.
+                    <br><br>Yakin lanjut?
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
+                <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Flash message --}}
+@if (session('status'))
+    <div class="alert alert-success mt-3">{{ session('status') }}</div>
+@endif
+@if ($errors->any())
+    <div class="alert alert-danger mt-3">
+        {{ $errors->first() }}
+    </div>
+@endif
 
 @push('scripts')
     <script>
@@ -868,5 +910,16 @@
 
             return false;
         });
+    </script>
+    <script>
+        // cegah double-submit
+        (function() {
+            const form = document.getElementById('formResetData');
+            const btn = document.getElementById('btnEksekusiReset');
+            form.addEventListener('submit', function() {
+                btn.disabled = true;
+                btn.textContent = 'Memproses...';
+            });
+        })();
     </script>
 @endpush

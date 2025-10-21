@@ -866,7 +866,48 @@ public function storetransaksi(Request $request)
         ],
     ]);
 }
+public function resetData(Request $request)
+    {
 
+        $tablesToWipe = [
+            'dat_barang',
+            'dat_buku_besar',
+            'dat_detail_jurnal',
+            'dat_detail_transaksi',
+            'dat_header_jurnal',
+            'dat_pelanggan',
+            'dat_pemasok',
+            'dat_transaksi',
+        ];
+
+        try {
+            DB::beginTransaction();
+
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+            foreach ($tablesToWipe as $table) {
+                DB::table($table)->delete();
+                DB::statement("ALTER TABLE `$table` AUTO_INCREMENT = 1");
+            }
+
+            DB::table('mst_akun')->update([
+                'saldo_awal'     => 0,
+                'saldo_berjalan' => 0,
+            ]);
+
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+            DB::commit();
+
+            return back()->with('status', 'Reset data berhasil dijalankan.');
+        } catch (\Throwable $e) {
+            try { DB::statement('SET FOREIGN_KEY_CHECKS=1'); } catch (\Throwable $ignored) {}
+            DB::rollBack();
+
+            report($e);
+            return back()->withErrors('Gagal mereset data: '.$e->getMessage());
+        }
+    }
 
 
 }
