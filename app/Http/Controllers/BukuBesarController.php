@@ -528,13 +528,19 @@ public function storetransaksi(Request $request)
                 ],
             ]);
 
-            // kurangi saldo akun biaya operasional jika diperlukan
+             if (in_array($tipe, ['Bayar Utang Bank'], true)) {
+                DB::table('mst_akun')
+                    ->where('id', 14)
+                    ->lockForUpdate()
+                    ->decrement('saldo_berjalan', $nominal);
+            }
             if (in_array($tipe, ['Bayar Gaji', 'Bayar Listrik', 'Bayar Utang Bank'], true)) {
                 DB::table('mst_akun')
                     ->where('id', 17)
                     ->lockForUpdate()
                     ->decrement('saldo_berjalan', $nominal);
             }
+            
         }
 
         // =========================
@@ -913,7 +919,7 @@ public function resetData(Request $request)
     {
 
         $tablesToWipe = [
-            'dat_barang',
+            
             'dat_buku_besar',
             'dat_detail_jurnal',
             'dat_detail_transaksi',
