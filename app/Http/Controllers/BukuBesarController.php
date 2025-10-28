@@ -532,7 +532,7 @@ public function storetransaksi(Request $request)
                 DB::table('mst_akun')
                     ->where('id', 14)
                     ->lockForUpdate()
-                    ->decrement('saldo_berjalan', $nominal);
+                    ->increment('saldo_berjalan', $nominal);
             }
             if (in_array($tipe, ['Bayar Gaji', 'Bayar Listrik', 'Bayar Utang Bank'], true)) {
                 DB::table('mst_akun')

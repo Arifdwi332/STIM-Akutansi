@@ -504,7 +504,7 @@
             <div class="modal-body">
                 <div class="alert alert-warning mb-0">
                     Tindakan ini akan <u>menghapus semua isi</u> tabel:
-                    <code>dat_barang, dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
+                    <code> dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
                         dat_transaksi</code><br>
                     dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
                     menjadi <b>0</b>.
