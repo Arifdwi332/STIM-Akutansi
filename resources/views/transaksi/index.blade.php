@@ -697,6 +697,8 @@
             const hargaBeli = toNumber(data.harga_satuan || 0);
             $tr.find('.item-harga').val(hargaBeli);
 
+            console.log('input .item-harga =', $tr.find('.item-harga').val());
+
             const hargaJual = toNumber(data.harga_jual || 0);
             $tr.find('.item-jual').val(hargaJual);
 
@@ -805,7 +807,7 @@
                             $(this).find('select.item-nama').val('');
                             $(this).find('.item-qty').val('0');
                             $(this).find('.item-satuan').val('').attr('placeholder', '-');
-                            $(this).find('.item-harga').val('0');
+                            $(this).find('.item-harga').val('2000');
                             $(this).find('.item-subtotal').val('0');
                         });
                         $('#biaya_lain').val('Rp. 0');

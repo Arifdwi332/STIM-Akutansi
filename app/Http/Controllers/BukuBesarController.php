@@ -165,7 +165,8 @@ public function subAkunList(Request $r)
 {
     $mstId   = $r->input('mst_akun_id');
     $subIds  = $r->input('sub_akun_id', []);   
-    $nominal = $r->input('nominal', []);       
+    $nominal = $r->input('nominal', []);      
+    $tanggal  = $r->input('tanggal', []);  
 
     if (!$mstId) {
         return response()->json(['ok'=>false,'message'=>'Kode akun wajib diisi'], 422);
@@ -188,7 +189,8 @@ public function subAkunList(Request $r)
     }
 
     try {
-        DB::transaction(function () use ($mstId, $subIds, $nominal, $count, $total) {
+       DB::transaction(function () use ($mstId, $subIds, $nominal, $tanggal, $count, $total) {
+        
             // update saldo induk (tambah ke nilai yg ada)
             /** @var MstAkunModel $mst */
             $mst = MstAkunModel::lockForUpdate()->findOrFail($mstId);
@@ -225,7 +227,69 @@ public function subAkunList(Request $r)
                 }
             }
 
+            //insert bukbes start
            $akunKode = (string) ($mst->kode_akun ?? '');
+            $isDebitNature = in_array($akunKode, ['1101','1103','1104'])
+                ? true
+                : (in_array($akunKode, ['2101','2201']) ? false : in_array(substr($akunKode, 0, 1), ['1','5']));
+
+            
+            $agg = [];
+          foreach ($nominal as $i => $val) {
+            if ($val <= 0) continue;
+
+           $periode = Carbon::parse($tanggal)->format('Y-m');
+
+            $tgl = $tanggal[$i] ?? null;
+            if (!empty($tgl)) {
+                try {
+                   $periode = Carbon::parse($tanggal)->format('Y-m');
+                } catch (\Throwable $e) {
+                }
+            }
+
+            if (!isset($agg[$periode])) $agg[$periode] = ['debit'=>0, 'kredit'=>0];
+            if ($isDebitNature)  $agg[$periode]['debit']  += $val;
+            else                 $agg[$periode]['kredit'] += $val;
+        }
+
+
+            $toInt = static function($v){
+                return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
+            };
+
+            $bb = DB::table('dat_buku_besar');
+            foreach ($agg as $periode => $dk) {
+                $row = $bb->lockForUpdate()
+                          ->where('id_akun', $mstId)
+                          ->where('periode', $periode)
+                          ->first();
+
+                if ($row) {
+                    $newDebit  = $toInt($row->ttl_debit)  + $dk['debit'];
+                    $newKredit = $toInt($row->ttl_kredit) + $dk['kredit'];
+
+                    $bb->where('id_akun', $mstId)
+                       ->where('periode', $periode)
+                       ->update([
+                           'ttl_debit'   => (string)$newDebit,
+                           'ttl_kredit'  => (string)$newKredit,
+                           'saldo_akhir' => (string)($newDebit - $newKredit),
+                           'updated_at'  => now(),
+                       ]);
+                } else {
+                    $bb->insert([
+                        'id_akun'     => $mstId,      
+                        'periode'     => $periode,    
+                        'ttl_debit'   => (string)$dk['debit'],
+                        'ttl_kredit'  => (string)$dk['kredit'],
+                        'saldo_akhir' => (string)($dk['debit'] - $dk['kredit']),
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]);
+                }
+            }
+            //insert bukbes end
            if ($akunKode === '1101' && $total > 0) {
 
             /** @var MstAkunModel $modal */
@@ -450,6 +514,7 @@ public function storetransaksi(Request $request)
             'Bayar Gaji',
             'Bayar Listrik',
             'Bayar Utang Bank',
+            'Bayar Utang Usaha',
             'Beli Peralatan Tunai',
             'Beli ATK Tunai',
             'Pengambilan Pribadi',
@@ -462,6 +527,7 @@ public function storetransaksi(Request $request)
                 'Bayar Gaji'             => [7,  1, 1, 2],
                 'Bayar Listrik'          => [8,  1, 1, 2],
                 'Bayar Utang Bank'       => [9,  1, 1, 2],
+                'Bayar Utang Usaha'       => [9,  1, 1, 2],
                 'Beli Peralatan Tunai'   => [10, 1, 2, 2],
                 'Beli ATK Tunai'         => [11, 1, 2, 2],
                 'Pengambilan Pribadi'    => [12, 1, 2, 2],
@@ -533,6 +599,12 @@ public function storetransaksi(Request $request)
                     ->where('id', 14)
                     ->lockForUpdate()
                     ->increment('saldo_berjalan', $nominal);
+            }
+             if (in_array($tipe, ['Bayar Utang Usaha'], true)) {
+                DB::table('mst_akun')
+                    ->where('id', 5)
+                    ->lockForUpdate()
+                    ->decrement('saldo_berjalan', $nominal);
             }
             if (in_array($tipe, ['Bayar Gaji', 'Bayar Listrik', 'Bayar Utang Bank'], true)) {
                 DB::table('mst_akun')

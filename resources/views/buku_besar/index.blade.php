@@ -278,7 +278,10 @@
                                                 <option value="" disabled selected>Pilih Sub Akun</option>
                                             </select>
                                         </div>
-                                        <div class="col-md-6 mb-2">
+                                        <div class="col-md-3 mb-2">
+                                            <input type="date" class="form-control bb-tanggal" name="tanggal[]">
+                                        </div>
+                                        <div class="col-md-3 mb-2">
                                             <div class="input-group">
                                                 <input type="text" class="form-control bb-nominal" name="nominal[]"
                                                     placeholder="Rp">
@@ -292,7 +295,7 @@
                                     </div>
                                 </div>
 
-                                <button id="btnAddDetail" type="button" class="btn btn-outline-primary btn-sm mt-1">
+                                <button id="btnAddDetail" type="button" class="btn btn-outline-primary btn-sm mt-1" hidden>
                                     Tambah Detail
                                 </button>
                             </div>

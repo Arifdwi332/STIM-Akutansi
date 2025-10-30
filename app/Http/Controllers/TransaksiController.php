@@ -468,9 +468,10 @@ class TransaksiController extends Controller
             : (float) $it['harga'];
 
               $hargaMentah = isset($it['harga_mentah'])
+             
         ? (float) $it['harga_mentah']
         : $harga;
-
+       
         $subtotal = (float) round($qty * $harga);       
         return [
             'barang_id' => (int) $it['barang_id'],
@@ -480,12 +481,15 @@ class TransaksiController extends Controller
             'harga_mentah'  => $hargaMentah,
             'subtotal'  => $subtotal,
             'total'     => (float) round($qty * $harga),
+            
         ];
     });
+  
 
     $tipePembayaran = (int) $request->input('tipe_pembayaran', 1);
     $tipePembayaran = ($tipePembayaran === 2) ? 2 : 1;
     $subtotal      = (float) $items->sum('total');
+  
     $biayaLain     = (float) ($request->biaya_lain ?? 0);
     $diskonPersen  = (float) ($request->diskon_persen ?? 0);
     $pajakPersen   = (float) ($request->pajak_persen ?? 11);
@@ -529,13 +533,20 @@ class TransaksiController extends Controller
 
         foreach ($items->values() as $idx => $it) {
             $isLast = ($idx === $items->count() - 1);
+            $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])
+                    ->lockForUpdate()
+                    ->first();
 
+                if (!$barang) {
+                    throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
+                }
             $base = (float) $it['total'];
             $afterDiscItem = (float) round($base * (1 - ($diskonPersen / 100)));
             $share = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
             $pajakItem = $applyPajak ? (int) round($afterDiscItem * ($pajakPersen / 100)) : 0;
             $biayaItem = (int) round($biayaLain * $share);
-
+            $hargaSatuan = (float) ($barang->harga_satuan ?? 0);
+            $hargaSatuanTotal   = (float) round($hargaSatuan * (float) $it['qty']); 
             if ($isLast) {
                 $pajakItem = $applyPajak ? (int) ($pajakNominal - $runningPajak) : 0;
                 $biayaItem = (int) ($biayaLain - $runningBiaya);
@@ -599,11 +610,13 @@ class TransaksiController extends Controller
                 $akunDebet  = 1;   // Kas
                 $akunKredit = 15;  // Pendapatan Penjualan
                 $tambahAkun17 = true;
+                $minAkun63 = true;
             } else {
                 // Kredit
                 $akunDebet  = 20;   // Piutang Usaha
                 $akunKredit = 15;  // Pendapatan Penjualan
                 $tambahAkun17 = true;
+                $minAkun63 = true;
             }
         } else {
             // PEMBELIAN (INVENTARIS)
@@ -612,14 +625,17 @@ class TransaksiController extends Controller
                 $akunDebet  = 6;   // Persediaan / Inventaris
                 $akunKredit = 1;   // Kas
                  $tambahAkun17 = false;
+                 $minAkun63 = false;
             } else {
                 // Kredit
                 $akunDebet  = 6;   // Persediaan / Inventaris
                 $akunKredit = 5;   // Utang Usaha
                  $tambahAkun17 = false;
+                 $minAkun63 = false;
             }
         }
 
+        $kreditMenambahSaldo = ($jenisCode === 2 /* Pembelian/Inventaris */ && $tipePembayaran === 2);
         // Panggil helper jurnal
         $this->insertJurnalSimple(
             $tglSql,
@@ -629,7 +645,8 @@ class TransaksiController extends Controller
             $akunKredit,
             2, 1,
             $noTransaksi,
-            $request->tipe
+            $request->tipe,
+            $kreditMenambahSaldo
         );
             if ($tambahAkun17) {
                 $periode = Carbon::parse($tglSql)->format('Y-m');
@@ -640,6 +657,15 @@ class TransaksiController extends Controller
                     ->lockForUpdate()
                     ->increment('saldo_berjalan', (float) $grandTotal);
             }
+            if ($minAkun63) {
+                $periode = Carbon::parse($tglSql)->format('Y-m');
+
+                DB::table('mst_akun')
+                    ->whereIn('id', [6, 3])
+                    ->lockForUpdate()
+                    ->decrement('saldo_berjalan', (float) $hargaSatuanTotal);
+            }
+            
         DB::commit();
         return response()->json([
             'ok' => true,
@@ -661,7 +687,8 @@ class TransaksiController extends Controller
     int $jenisLaporanDebet = 2,
     int $jenisLaporanKredit = 1,
     string $noReferensi = 'tes',
-    string $modulSumber = 'tes'
+    string $modulSumber = 'tes',
+    bool $kreditMenambahSaldo = false 
 ): void {
     $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
         'tgl_transaksi' => $tanggal,
@@ -727,8 +754,15 @@ class TransaksiController extends Controller
     }
 
     DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()->increment('saldo_berjalan', $nominal);
-    DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
-}
+    if ($kreditMenambahSaldo) {
+            // kasus else: pembelian kredit → kredit MENAMBAH saldo (Utang)
+            DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+                ->increment('saldo_berjalan', $nominal);
+        } else {
+            DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+                ->decrement('saldo_berjalan', $nominal);
+        }
+    }
 
     
 public function datatableTransaksi()

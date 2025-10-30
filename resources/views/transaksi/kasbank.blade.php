@@ -102,6 +102,7 @@
                                         <option value="Bayar Gaji">Bayar Gaji</option>
                                         <option value="Bayar Listrik">Bayar Listrik</option>
                                         <option value="Bayar Utang Bank">Bayar Utang Bank</option>
+                                        <option value="Bayar Utang Usaha">Bayar Utang Usaha</option>
                                         <option value="Beli Peralatan Tunai">Beli Peralatan Tunai</option>
                                         <option value="Beli ATK Tunai">Beli ATK Tunai</option>
                                         <option value="Pengambilan Pribadi">Pengambilan Pribadi</option>
