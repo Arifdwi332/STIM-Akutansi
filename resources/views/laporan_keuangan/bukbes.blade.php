@@ -229,9 +229,10 @@
                                 <tr>
                                     <th>Tanggal</th>
                                     <th>Keterangan</th>
-                                    <th>Nama Akun</th>
+
                                     <th>Debet</th>
                                     <th>Kredit</th>
+                                    <th>Saldo</th>
                                 </tr>
                             </thead>
                             <tbody id="tblDetailBody"></tbody>
@@ -265,7 +266,7 @@
                     <tr>
                         <td>${r.tanggal ?? ''}</td>
                         <td>${r.keterangan ?? ''}</td>
-                        <td>${r.nama_akun ?? ''}</td>
+                        
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
                     </tr>

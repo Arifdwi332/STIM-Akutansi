@@ -526,8 +526,8 @@ public function storetransaksi(Request $request)
             $map = [
                 'Bayar Gaji'             => [7,  1, 1, 2],
                 'Bayar Listrik'          => [8,  1, 1, 2],
-                'Bayar Utang Bank'       => [9,  1, 1, 2],
-                'Bayar Utang Usaha'       => [9,  1, 1, 2],
+                'Bayar Utang Bank'       => [9,  1, 2, 99],
+                'Bayar Utang Usaha'       => [9,  1, 2, 99],
                 'Beli Peralatan Tunai'   => [10, 1, 2, 2],
                 'Beli ATK Tunai'         => [11, 1, 2, 2],
                 'Pengambilan Pribadi'    => [12, 1, 2, 2],
@@ -538,6 +538,21 @@ public function storetransaksi(Request $request)
 
             [$akunD, $akunK, $jlD, $jlK] = $map[$tipe];
 
+            if ($tipe === 'Bayar Utang Bank') {
+                $saldoUtangBank = (float) DB::table('mst_akun')->where('id', 14)->lockForUpdate()->value('saldo_berjalan');
+                if ($saldoUtangBank <= 0) {
+                    throw new \RuntimeException('Anda tidak memiliki utang bank.');
+                }
+                
+            }
+
+            if ($tipe === 'Bayar Utang Usaha') {
+                $saldoUtangUsaha = (float) DB::table('mst_akun')->where('id', 5)->lockForUpdate()->value('saldo_berjalan');
+                if ($saldoUtangUsaha <= 0) {
+                    throw new \RuntimeException('Anda tidak memiliki utang usaha.');
+                }
+              
+            }
             if ($akunK == 1) {
                 $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
                 if ($saldoKas < $nominal) {
@@ -598,7 +613,7 @@ public function storetransaksi(Request $request)
                 DB::table('mst_akun')
                     ->where('id', 14)
                     ->lockForUpdate()
-                    ->increment('saldo_berjalan', $nominal);
+                    ->decrement('saldo_berjalan', $nominal);
             }
              if (in_array($tipe, ['Bayar Utang Usaha'], true)) {
                 DB::table('mst_akun')

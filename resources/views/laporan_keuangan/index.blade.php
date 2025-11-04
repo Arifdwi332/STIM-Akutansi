@@ -236,82 +236,7 @@
 
             $('#searchJurnal').on('input', () => loadLabaRugi(1));
             loadLabaRugi();
-            // ====== NERACA ======
-            // function loadNeraca(page = 1) {
-            //     const q = $('#searchBuku').val() || '';
-            //     const url = "{{ route('laporan_keuangan.get_neraca') }}";
 
-            //     $.getJSON(url, {
-            //         search: q,
-            //         page,
-            //         per_page: 20
-            //     }, function(res) {
-            //         if ($('#tblBuku tbody').length === 0) $('#tblBuku').append('<tbody></tbody>');
-            //         const $body = $('#tblBuku tbody').empty();
-
-            //         const kategoriMap = {
-            //             aset: "ASET",
-            //             liabilitas: "LIABILITAS",
-            //             ekuitas: "EKUITAS"
-            //         };
-
-            //         let totalAset = 0,
-            //             totalLiabilitas = 0,
-            //             totalEkuitas = 0;
-
-            //         Object.keys(kategoriMap).forEach(key => {
-            //             const rows = res.data?.[key] || [];
-            //             if (rows.length === 0) return;
-
-            //             // header kategori (highlight)
-            //             $body.append(`
-        //     <tr class="table-secondary fw-bold">
-        //         <td colspan="2">${kategoriMap[key]}</td>
-        //     </tr>
-        // `);
-
-            //             let subtotal = 0;
-            //             rows.forEach(r => {
-            //                 const namaAkun = r.nama_akun ?? '';
-            //                 const saldo = Number(r.saldo ?? 0);
-            //                 subtotal += saldo;
-
-            //                 $body.append(`
-        //         <tr>
-        //             <td>${namaAkun}</td>
-        //             <td class="text-end">${rp(saldo)}</td>
-        //         </tr>
-        //     `);
-            //             });
-
-            //             if (key === "aset") totalAset = subtotal;
-            //             if (key === "liabilitas") totalLiabilitas = subtotal;
-            //             if (key === "ekuitas") totalEkuitas = subtotal;
-
-            //             // baris total kategori (bold tanpa highlight)
-            //             $body.append(`
-        //     <tr class="fw-bold">
-        //         <td>TOTAL ${kategoriMap[key]}</td>
-        //         <td class="text-end">${rp(subtotal)}</td>
-        //     </tr>
-        // `);
-            //         });
-
-            //         // Tambahkan total Liabilitas + Ekuitas (dibuat bold + highlight khusus)
-            //         if (totalLiabilitas || totalEkuitas) {
-            //             $body.append(`
-        //     <tr class="fw-bold table-dark text-white">
-        //         <td>TOTAL LIABILITAS + EKUITAS</td>
-        //         <td class="text-end">${rp(totalLiabilitas + totalEkuitas)}</td>
-        //     </tr>
-        // `);
-            //         }
-
-            //         $('#pgBuku').text(`Total akun: ${res.total ?? 0} | Hal: ${res.page ?? 1}`);
-            //     }).fail(function(xhr) {
-            //         console.error('loadNeraca error:', xhr?.responseText || xhr.statusText);
-            //     });
-            // }
 
             // ====== NERACA ======
             function loadNeraca(page = 1) {
@@ -380,8 +305,13 @@
             `);
                     });
 
-
-
+                    const totalLiabEkuitas = totalLiabilitas + totalEkuitas;
+                    $body.append(`
+            <tr class="row-grand">
+                <td>Total Liabilitas + Ekuitas</td>
+                <td class="text-end">${rp(totalLiabEkuitas)}</td>
+            </tr>
+        `);
                     $('#pgBuku').text(`Total akun: ${res.total ?? 0} | Hal: ${res.page ?? 1}`);
                 }).fail(function(xhr) {
                     console.error('loadNeraca error:', xhr?.responseText || xhr.statusText);

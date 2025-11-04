@@ -266,7 +266,7 @@
                         <!-- ===== Pasangan Sub Akun ↔ Nominal (sejajar) ===== -->
                         <div class="form-row">
                             <div class="col-12">
-                                <label class="mb-2 d-block">Sub Akun & Nominal</label>
+                                <label class="mb-2 d-block">Tanggal & Nominal</label>
 
                                 <!-- container semua pasangan -->
                                 <div id="pair-wrap">
@@ -274,14 +274,13 @@
                                     <div class="form-row align-items-start bb-pair">
                                         <div class="col-md-6 mb-2">
                                             <select class="form-control sub-akun-select" id="sub_akun_id"
-                                                name="sub_akun_id[]" disabled>
-                                                <option value="" disabled selected>Pilih Sub Akun</option>
+                                                name="sub_akun_id[]" hidden>
+                                                <option value="" hidden selected>Pilih Sub Akun</option>
                                             </select>
-                                        </div>
-                                        <div class="col-md-3 mb-2">
                                             <input type="date" class="form-control bb-tanggal" name="tanggal[]">
                                         </div>
-                                        <div class="col-md-3 mb-2">
+
+                                        <div class="col-md-6 mb-2">
                                             <div class="input-group">
                                                 <input type="text" class="form-control bb-nominal" name="nominal[]"
                                                     placeholder="Rp">
