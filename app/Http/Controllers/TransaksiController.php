@@ -433,7 +433,7 @@ class TransaksiController extends Controller
         'tanggal'           => ['required','string'],
         'pelanggan_id'      => ['nullable','integer'],
         'party_id'          => ['nullable','integer'],
-        'no_transaksi'      => ['nullable','string','max:50'],
+        'no_transaksi'      => ['required_if:tipe,Inventaris','nullable','string','max:50'],
         'biaya_lain'        => ['nullable','numeric'],
         'diskon_persen'     => ['nullable','numeric','min:0','max:100'],
         'pajak_persen'      => ['nullable','numeric','min:0','max:100'],
@@ -502,23 +502,32 @@ class TransaksiController extends Controller
     $jenisCode     = $request->tipe === 'Penjualan' ? 1 : 2;
     $prefix        = $jenisCode === 1 ? 'P' : 'S';
 
-    // ============================
-    // Generate Nomor Transaksi
-    // ============================
+  
     $noTransaksi = trim((string) $request->no_transaksi);
-    $valid = preg_match('/^[PS]\d{7}$/', $noTransaksi);
 
-    if (!$valid) {
-        $lastNo = DB::table('dat_transaksi')
-            ->where('no_transaksi', 'like', $prefix . '%')
-            ->orderByDesc('id_transaksi')
-            ->value('no_transaksi');
-
-        $seq = 0;
-        if ($lastNo && preg_match('/\d+$/', $lastNo, $m)) {
-            $seq = (int) $m[0];
+    if ($request->tipe === 'Inventaris') {
+        // PEMBELIAN: WAJIB pakai input, tidak generate
+        if ($noTransaksi === '') {
+            return response()->json(['ok' => false, 'message' => 'No transaksi wajib diisi untuk pembelian'], 422);
         }
-        $noTransaksi = $prefix . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
+        if (DB::table('dat_transaksi')->where('no_transaksi', $noTransaksi)->exists()) {
+            return response()->json(['ok' => false, 'message' => 'No transaksi sudah digunakan'], 422);
+        }
+    } else {
+        // PENJUALAN: auto-generate (prefix "P"), abaikan input jika tidak valid
+        $valid = preg_match('/^P\d{7}$/', $noTransaksi);
+        if (!$valid) {
+            $lastNo = DB::table('dat_transaksi')
+                ->where('no_transaksi', 'like', 'P%')
+                ->orderByDesc('id_transaksi')
+                ->value('no_transaksi');
+
+            $seq = 0;
+            if ($lastNo && preg_match('/\d+$/', $lastNo, $m)) {
+                $seq = (int) $m[0];
+            }
+            $noTransaksi = 'P' . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
+        }
     }
 
     DB::beginTransaction();

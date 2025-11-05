@@ -243,11 +243,13 @@
 
                     <div class="gap-12"></div>
 
-                    {{-- No Transaksi --}}
-                    <div class="form-group d-flex flex-column fx-180">
-                        {{-- <label class="mb-1">No Transaksi</label> --}}
-                        <input type="hidden" class="form-control" id="no_transaksi" readonly>
+                    <div class="form-group d-flex flex-column fx-180" id="group_no_transaksi">
+                        <label class="mb-1">No Transaksi</label>
+                        <input type="text" class="form-control" id="no_transaksi" name="no_transaksi">
                     </div>
+
+
+
                 </div>
 
                 {{-- Tabel barang --}}
@@ -607,14 +609,33 @@
 
     <script>
         window.applyMode = function(mode) {
-            const isInv = (mode === 'Inventaris');
+            const isInv = (mode === 'Inventaris'); // pembelian
+
             $('#party_label').text(isInv ? 'Pemasok' : 'Pelanggan');
             $('#btnAddParty').text(isInv ? 'Tambah Pemasok' : 'Tambah Pelanggan');
 
             $('#no_transaksi').val('');
-
             $('#group_diskon').toggle(!isInv);
+
+            const $grpNo = $('#group_no_transaksi');
+            const $no = $('#no_transaksi');
+            const $lbl = $grpNo.find('label');
+
+            if (isInv) {
+                // PEMBELIAN: tampilkan label + input
+                $grpNo.removeClass('d-none');
+                $lbl.removeClass('d-none');
+                $no.attr('type', 'text').prop('readonly', false); // ubah ke true jika mau readonly
+            } else {
+                // PENJUALAN: sembunyikan label + input
+                $grpNo.addClass('d-none');
+                $lbl.addClass('d-none');
+                $no.attr('type', 'hidden').prop('readonly', false);
+            }
         };
+
+
+
 
 
         function loadPartyOptions(tipe) {
@@ -784,6 +805,7 @@
                 biaya_lain: parseRupiahbiayalain($('#biaya_lain').val()),
                 diskon_persen: _num($('#diskon_persen').val()),
                 pajak_persen: 11,
+                no_transaksi: $.trim($('#no_transaksi').val()),
                 apply_pajak: $('#apply_pajak').is(':checked') ? 1 : 0,
                 items: items
             };

@@ -22,25 +22,6 @@ class BukuBesarController extends Controller
         return view('buku_besar.index', compact('mstAkun'));
     }
 
-    public function jurnalData()
-    {
-        $data = collect([
-            ['tanggal'=>'19/09/2025','keterangan'=>'tes','akun'=>'1130 - Piutang','debet'=>null,'kredit'=>50000000,'tipe'=>'Kredit'],
-            ['tanggal'=>'20/09/2025','keterangan'=>'tes','akun'=>'2101 - Kas','debet'=>50000000,'kredit'=>null,'tipe'=>'Debet'],
-        ]);
-
-        return DataTables::of($data)->make(true);
-    }
-
-    public function bukuBesarData()
-    {
-        $data = collect([
-            ['akun'=>'1130 - Piutang','tanggal'=>'19/09/2025','debet'=>null,'kredit'=>50000000,'saldo'=>-50000000,'tipe'=>'Kredit'],
-            ['akun'=>'2101 - Kas','tanggal'=>'20/09/2025','debet'=>50000000,'kredit'=>null,'saldo'=>50000000,'tipe'=>'Debet'],
-        ]);
-
-        return DataTables::of($data)->make(true);
-    }
 
     public function storeakun(Request $r)
     {
@@ -526,8 +507,8 @@ public function storetransaksi(Request $request)
             $map = [
                 'Bayar Gaji'             => [7,  1, 1, 2],
                 'Bayar Listrik'          => [8,  1, 1, 2],
-                'Bayar Utang Bank'       => [9,  1, 2, 99],
-                'Bayar Utang Usaha'       => [9,  1, 2, 99],
+                'Bayar Utang Bank'       => [14,  1, 2, 2],
+                'Bayar Utang Usaha'       => [9,  1, 2, 2],
                 'Beli Peralatan Tunai'   => [10, 1, 2, 2],
                 'Beli ATK Tunai'         => [11, 1, 2, 2],
                 'Pengambilan Pribadi'    => [12, 1, 2, 2],
@@ -609,12 +590,12 @@ public function storetransaksi(Request $request)
                 ],
             ]);
 
-             if (in_array($tipe, ['Bayar Utang Bank'], true)) {
-                DB::table('mst_akun')
-                    ->where('id', 14)
-                    ->lockForUpdate()
-                    ->decrement('saldo_berjalan', $nominal);
-            }
+            //  if (in_array($tipe, ['Bayar Utang Bank'], true)) {
+            //     DB::table('mst_akun')
+            //         ->where('id', 14)
+            //         ->lockForUpdate()
+            //         ->decrement('saldo_berjalan', $nominal);
+            // }
              if (in_array($tipe, ['Bayar Utang Usaha'], true)) {
                 DB::table('mst_akun')
                     ->where('id', 5)
@@ -733,8 +714,17 @@ public function storetransaksi(Request $request)
             }
         }
 
-        // 4) Update saldo_berjalan (atomic, dengan lock)
-        $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()->increment('saldo_berjalan', $nominal);
+        if ($akunDebet === 14) {
+            $affD = DB::table('mst_akun')
+                ->where('id', $akunDebet)
+                ->lockForUpdate()
+                ->decrement('saldo_berjalan', $nominal);
+        } else {
+            $affD = DB::table('mst_akun')
+                ->where('id', $akunDebet)
+                ->lockForUpdate()
+                ->increment('saldo_berjalan', $nominal);
+        }
         $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
 
         if ($affD === 0) {
