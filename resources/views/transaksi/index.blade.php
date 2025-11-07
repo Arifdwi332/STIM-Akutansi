@@ -212,6 +212,11 @@
                             <option value="2" selected>Non Tunai</option>
                         </select>
                     </div>
+                    <div class="form-group d-flex align-items-end fx-140">
+                        <button class="btn btn-info btn-sm btn-equal w-100" id="btnTambahBarang" type="button">
+                            Tambah Barang
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Baris 1 --}}
@@ -305,7 +310,8 @@
                         <div class="form-group row">
                             <label class="col-sm-4 col-form-label">Biaya lainya</label>
                             <div class="col-sm-8">
-                                <input type="text" id="biaya_lain" class="form-control text-right rupiah" value="0">
+                                <input type="text" id="biaya_lain" class="form-control text-right rupiah"
+                                    value="0">
                             </div>
                         </div>
 
@@ -678,6 +684,10 @@
                     $('#formPelangganBaru')[0] && $('#formPelangganBaru')[0].reset();
                 }
                 $(isInv ? '#modalPemasokBaru' : '#modalPelangganBaru').modal('show');
+            });
+            $(document).on('click', '#btnTambahBarang', function() {
+
+                $('#modalBarangBaru').modal('show');
             });
         });
     </script>
@@ -1120,6 +1130,35 @@
                     loadBarang('Penjualan', null);
                 }
             }
+        });
+
+        function loadPemasokInventaris($select) {
+            return $.get("{{ route('inventaris.parties') }}", {
+                    tipe: 'Inventaris'
+                })
+                .done(function(res) {
+                    $select.empty().append('<option value="">Pilih Pemasok</option>');
+                    (res?.data || []).forEach(function(row) {
+                        // row = {id, nama, kode_pemasok}
+                        $select.append(
+                            $('<option/>', {
+                                value: row.id,
+                                text: row.nama
+                            })
+                            .attr('data-kode', row.kode_pemasok)
+                        );
+                    });
+                });
+        }
+
+
+        $('#modalBarangBaru').on('show.bs.modal', function() {
+            const $sel = $('#pemasok_id');
+            loadPemasokInventaris($sel).then(function() {
+                const curr = $('#party_id').val(); // pemasok yg sedang dipilih di form utama (jika ada)
+                if (curr) $sel.val(curr);
+                $('#kode_pemasok').val($sel.find(':selected').data('kode') || '');
+            });
         });
     </script>
 @endpush

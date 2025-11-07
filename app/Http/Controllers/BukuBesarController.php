@@ -491,31 +491,68 @@ public function storetransaksi(Request $request)
         }
 
         
-        elseif (in_array($tipe, [
+       elseif (in_array($tipe, [
             'Bayar Gaji',
-            'Bayar Listrik',
+           
+            'Bayar Listrik/Telepon/Internet/Air',
             'Bayar Utang Bank',
             'Bayar Utang Usaha',
+            'Bayar Utang Lainnya',
+            'Bayar Bunga Bank',
+            'Bayar Pajak',
+            'Bayar Iklan/Promosi',
+            'Bayar Transportasi (Ongkir, BBM, dll)',
+            'Bayar Sewa Ruko/Outlet/dll',
+            'Bayar Pemeliharaan (Servis, dll)',
+            'Bayar Lain-lain',
             'Beli Peralatan Tunai',
             'Beli ATK Tunai',
+            'Beli Tanah Tunai',
+            'Membuat/Beli Bangunan Tunai',
+            'Beli Kendaraan Tunai',
             'Pengambilan Pribadi',
             'Pinjam Uang di Bank',
+            'Pinjam Uang Lainnya',
             'Pendapatan Bunga',
+            'Pendapatan Lain-lain (Komisi/Hadiah)',
             'Setoran Pemilik',
+            'Jual Tanah',
+            'Jual Bangunan',
+            'Jual Kendaraan',
         ], true)) {
 
             $map = [
-                'Bayar Gaji'             => [7,  1, 1, 2],
-                'Bayar Listrik'          => [8,  1, 1, 2],
-                'Bayar Utang Bank'       => [14,  1, 2, 2],
-                'Bayar Utang Usaha'       => [9,  1, 2, 2],
-                'Beli Peralatan Tunai'   => [10, 1, 2, 2],
-                'Beli ATK Tunai'         => [11, 1, 2, 2],
-                'Pengambilan Pribadi'    => [12, 1, 2, 2],
-                'Pinjam Uang di Bank'    => [1, 14, 2, 2],
-                'Pendapatan Bunga'       => [1, 15, 2, 1],
-                'Setoran Pemilik'        => [1, 16, 2, 2],
+                // Sudah ada
+                'Bayar Gaji'                          => [7,  1, 1, 2],
+                'Bayar Listrik'                       => [8,  1, 1, 2],
+                'Bayar Utang Bank'                    => [14, 1, 2, 2],
+                'Bayar Utang Usaha'                   => [9,  1, 2, 2],
+                'Beli Peralatan Tunai'                => [10, 1, 2, 2],
+                'Beli ATK Tunai'                      => [11, 1, 2, 2],
+                'Pengambilan Pribadi'                 => [12, 1, 2, 2],
+                'Pinjam Uang di Bank'                 => [1,  14, 2, 2],
+                'Pendapatan Bunga'                    => [1,  58, 2, 1],
+                'Setoran Pemilik'                     => [1,  16, 2, 2],
+
+                'Bayar Listrik/Telepon/Internet/Air'  => [69, 1, 1, 2],
+                'Bayar Utang Lainnya'                 => [59, 1, 2, 2],
+                'Bayar Bunga Bank'                    => [9, 1, 1, 2],
+                'Bayar Pajak'                         => [13, 1, 1, 2],
+                'Bayar Iklan/Promosi'                 => [61, 1, 1, 2],
+                'Bayar Transportasi (Ongkir, BBM, dll)'=> [66, 1, 1, 2],
+                'Bayar Sewa Ruko/Outlet/dll'          => [67, 1, 1, 2],
+                'Bayar Pemeliharaan (Servis, dll)'    => [70, 1, 1, 2],
+                'Bayar Lain-lain'                     => [71, 1, 1, 2],
+                'Beli Tanah Tunai'                    => [11, 1, 2, 2],
+                'Membuat/Beli Bangunan Tunai'         => [43, 1, 2, 2],
+                'Beli Kendaraan Tunai'                => [42, 1, 2, 2],
+                'Pinjam Uang Lainnya'                 => [1, 59, 2, 2],
+                'Pendapatan Lain-lain (Komisi/Hadiah)'=> [1, 52, 2, 1],
+                'Jual Tanah'                          => [1, 42, 2, 2],
+                'Jual Bangunan'                       => [1, 43, 2, 2],
+                'Jual Kendaraan'                      => [1, 45, 2, 2],
             ];
+
 
             [$akunD, $akunK, $jlD, $jlK] = $map[$tipe];
 
@@ -534,14 +571,33 @@ public function storetransaksi(Request $request)
                 }
               
             }
+             if ($tipe === 'Bayar Utang Lainnya') {                         
+                $saldoUtangLain = (float) DB::table('mst_akun')->where('id', 59)->lockForUpdate()->value('saldo_berjalan');
+                if ($saldoUtangLain <= 0) {
+                    throw new \RuntimeException('Anda tidak memiliki utang lainnya.');
+                }
+            }
             if ($akunK == 1) {
                 $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
                 if ($saldoKas < $nominal) {
                     throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
                 }
             }
+            $tipeKreditNaik = [                       
+                'Setoran Pemilik',
+                'Pinjam Uang di Bank',
+                'Pinjam Uang Lainnya',
+                'Pendapatan Bunga',
+                'Pendapatan Lain-lain (Komisi/Hadiah)',
+                'Pinjang Uang Lainnya',                       
+            ];
+            $kreditMenambahSaldo = in_array($tipe, $tipeKreditNaik, true); 
 
-            
+            $tipeDebetBerkurang = [
+                'Bayar Utang Bank',
+                'Bayar Utang Lainnya',
+            ];
+            $debetMengurangiSaldo = in_array($tipe, $tipeDebetBerkurang, true);
             $this->insertJurnalSimple(
                 $tanggal,
                 (float)$nominal,
@@ -551,7 +607,9 @@ public function storetransaksi(Request $request)
                 (int)$jlD,
                 (int)$jlK,
                 $noTransaksi,
-                'Transaksi Kas/Bank'
+                'Transaksi Kas/Bank',
+                $kreditMenambahSaldo,
+                 $debetMengurangiSaldo
             );
 
             // === HEADER TRANSAKSI ===
@@ -641,7 +699,9 @@ public function storetransaksi(Request $request)
         int $jenisLaporanDebet = 1,
         int $jenisLaporanKredit = 1,
         string $noReferensi = 'tes',
-        string $modulSumber = 'tes'
+        string $modulSumber = 'tes',
+        bool $kreditMenambahSaldo = false,
+        bool $debetMengurangiSaldo = false
     ): void {
         // 1) Header jurnal
         $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
@@ -714,19 +774,22 @@ public function storetransaksi(Request $request)
             }
         }
 
-        if ($akunDebet === 14) {
-            $affD = DB::table('mst_akun')
-                ->where('id', $akunDebet)
-                ->lockForUpdate()
+        if ($debetMengurangiSaldo) {                                               // [NEW]
+        $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
                 ->decrement('saldo_berjalan', $nominal);
         } else {
-            $affD = DB::table('mst_akun')
-                ->where('id', $akunDebet)
-                ->lockForUpdate()
+            $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
                 ->increment('saldo_berjalan', $nominal);
         }
-        $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
 
+        // $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
+        if ($kreditMenambahSaldo) {
+            $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+                ->increment('saldo_berjalan', $nominal);
+        } else {
+            $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+                ->decrement('saldo_berjalan', $nominal);
+    }
         if ($affD === 0) {
             throw new \RuntimeException("Akun debet (ID {$akunDebet}) tidak ditemukan di mst_akun.");
         }

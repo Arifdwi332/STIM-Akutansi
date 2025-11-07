@@ -269,6 +269,7 @@
                         
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
+                        <td>${rp(r.saldo)}</td>
                     </tr>
                 `);
                     });

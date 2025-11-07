@@ -99,19 +99,55 @@
                                 <div class="form-group col-md-6">
                                     <label>Tipe Transaksi</label>
                                     <select id="tipe_transaksi" class="custom-select">
+                                        <!-- Pembayaran Operasional -->
                                         <option value="Bayar Gaji">Bayar Gaji</option>
                                         <option value="Bayar Listrik">Bayar Listrik</option>
+                                        <option value="Bayar Listrik/Telepon/Internet/Air">Bayar
+                                            Listrik/Telepon/Internet/Air</option>
+                                        <option value="Bayar Iklan/Promosi">Bayar Iklan/Promosi</option>
+                                        <option value="Bayar Transportasi (Ongkir, BBM, dll)">Bayar Transportasi (Ongkir,
+                                            BBM, dll)</option>
+                                        <option value="Bayar Sewa Ruko/Outlet/dll">Bayar Sewa Ruko/Outlet/dll</option>
+
+                                        <option value="Bayar Pemeliharaan (Servis, dll)">Bayar Pemeliharaan (Servis, dll)
+                                        </option>
+                                        <option value="Bayar Pajak">Bayar Pajak</option>
+                                        <option value="Bayar Lain-lain">Bayar Lain-lain</option>
+
+                                        <!-- Utang & Bunga -->
                                         <option value="Bayar Utang Bank">Bayar Utang Bank</option>
                                         <option value="Bayar Utang Usaha">Bayar Utang Usaha</option>
+                                        <option value="Bayar Utang Lainnya">Bayar Utang Lainnya</option>
+                                        <option value="Bayar Bunga Bank">Bayar Bunga Bank</option>
+
+                                        <!-- Pembelian Aset / Barang -->
                                         <option value="Beli Peralatan Tunai">Beli Peralatan Tunai</option>
                                         <option value="Beli ATK Tunai">Beli ATK Tunai</option>
-                                        <option value="Pengambilan Pribadi">Pengambilan Pribadi</option>
+                                        <option value="Beli Tanah Tunai">Beli Tanah Tunai</option>
+                                        <option value="Membuat/Beli Bangunan Tunai">Membuat/Beli Bangunan Tunai</option>
+
+                                        <option value="Beli Kendaraan Tunai">Beli Kendaraan Tunai</option>
+
+                                        <!-- Penjualan Aset -->
+                                        <option value="Jual Tanah">Jual Tanah</option>
+                                        <option value="Jual Bangunan">Jual Bangunan</option>
+                                        <option value="Jual Kendaraan">Jual Kendaraan</option>
+
+                                        <!-- Pendanaan & Pendapatan -->
                                         <option value="Pinjam Uang di Bank">Pinjam Uang di Bank</option>
+                                        <option value="Pinjam Uang Lainnya">Pinjam Uang Lainnya</option>
                                         <option value="Pendapatan Bunga">Pendapatan Bunga</option>
+                                        <option value="Pendapatan Lain-lain (Komisi/Hadiah)">Pendapatan Lain-lain
+                                            (Komisi/Hadiah)</option>
                                         <option value="Setoran Pemilik">Setoran Pemilik</option>
+                                        <option value="Pengambilan Pribadi">Pengambilan Pribadi</option>
+
+
+
                                         <option value="Manual">Manual</option>
                                     </select>
                                 </div>
+
                                 <div class="form-group col-md-6">
                                     <label>Nominal</label>
                                     <input type="text" class="form-control rupiah" id="trx_nominal"

@@ -58,6 +58,7 @@ Route::prefix('inventaris')->name('inventaris.')->group(function () {
     Route::post('/store',          [TransaksiController::class, 'store'])->name('store');     
     Route::post('/pelanggan/store', [TransaksiController::class, 'storePelanggan'])->name('pelanggan.store');
     Route::post('/pemasok/store', [TransaksiController::class, 'storePemasok'])->name('pemasok.store');   
+    Route::post('/barang/store', [TransaksiController::class, 'storeBarang'])->name('barang.store');  
     Route::get('/parties', [TransaksiController::class, 'getParties'])->name('parties');
     Route::get('/barang', [TransaksiController::class, 'barangList'])->name('barang');
     Route::get('/transaksi', [TransaksiController::class, 'datatableTransaksi'])

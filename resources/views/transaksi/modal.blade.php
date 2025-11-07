@@ -132,6 +132,69 @@
         </form>
     </div>
 </div>
+
+{{-- Modal Tambah Barang --}}
+<div class="modal fade" id="modalBarangBaru" tabindex="-1" role="dialog" aria-labelledby="modalBarangBaruLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:520px;">
+        <form id="formBarangBaru" class="w-100">
+            @csrf
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h6 class="modal-title mb-0" id="modalBarangBaruLabel">Tambah Barang Baru</h6>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
+
+                    <!-- optional: tetap ada kalau backend butuh -->
+                    <input type="hidden" class="form-control" id="kode_pemasok" name="kode_pemasok">
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="pemasok_id" style="font-weight:600;">Pemasok</label>
+                        <select class="form-control" id="pemasok_id" name="pemasok_id" required>
+                            <option value="">Memuat pemasok...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="nama_barang2" style="font-weight:600;">Nama Barang</label>
+                        <input type="text" class="form-control" id="nama_barang2" name="nama_barang2"
+                            placeholder="Nama Barang" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="harga_satuan2" style="font-weight:600;">Harga Satuan</label>
+                        <input type="text" class="form-control rupiah" id="harga_satuan2" name="harga_satuan2"
+                            placeholder="Harga Satuan" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="satuan_ukur2" style="font-weight:600;">Satuan Ukur</label>
+                        <input type="text" class="form-control" id="satuan_ukur2" name="satuan_ukur2"
+                            placeholder="Satuan Ukur" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="mb-1" for="harga_jual2" style="font-weight:600;">Harga Jual</label>
+                        <input type="text" class="form-control rupiah" id="harga_jual2" name="harga_jual2"
+                            placeholder="Harga Jual" required>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-dismiss="modal">Tutup</button>
+                    <button type="submit" class="btn btn-primary" id="btnSimpanBarangBaru">Simpan</button>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
 <!-- Modal Detail Barang -->
 <div class="modal fade" id="modalDetailBarang" tabindex="-1" role="dialog"
     aria-labelledby="modalDetailBarangLabel" aria-hidden="true">
@@ -307,6 +370,7 @@
             $('#modalPemasokBaru').modal('show');
         });
 
+
         $('#formPemasokBaru').on('submit', function(e) {
             e.preventDefault();
 
@@ -341,6 +405,63 @@
                     if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON
                         .message;
                     (window.toastr && toastr.error) ? toastr.error(msg): alert(msg);
+                })
+                .always(function() {
+                    $btn.prop('disabled', false).text('Simpan');
+                });
+        });
+        $(document).on('change', '#pemasok_id', function() {
+            $('#kode_pemasok').val($(this).find(':selected').data('kode') || '');
+        });
+
+        $('#formBarangBaru').on('submit', function(e) {
+            e.preventDefault();
+            const $btn = $('#btnSimpanBarangBaru').prop('disabled', true).text('Menyimpan...');
+
+            const payload = {
+                pemasok_id: $('#pemasok_id').val(),
+                kode_pemasok: $('#kode_pemasok').val(),
+                nama_barang2: $('#nama_barang2').val().trim(),
+                harga_satuan2: toNumber($('#harga_satuan2').val()),
+                satuan_ukur2: $('#satuan_ukur2').val().trim(),
+                harga_jual2: toNumber($('#harga_jual2').val()),
+            };
+            console.log('payload kirim:', payload);
+
+            if (!payload.pemasok_id) {
+                alert('Pilih pemasok terlebih dahulu.');
+                return $btn.prop('disabled', false).text('Simpan');
+            }
+
+            $.ajax({
+                    method: 'POST',
+                    url: "{{ route('inventaris.barang.store') }}",
+                    data: payload,
+                    dataType: 'json'
+                })
+                .done(function(res) {
+                    if (res && res.ok) {
+                        if (window.toastr?.success) toastr.success(res.message ||
+                            'Barang tersimpan');
+                        else alert(res.message || 'Barang tersimpan');
+
+
+                        $('#formBarangBaru')[0].reset();
+                        $('#kode_pemasok').val('');
+                        $('#modalBarangBaru').modal('hide');
+
+
+                        const mode = $('#tipe_transaksi').val();
+                        const pemasokId = $('#party_id').val() || null;
+                        loadBarang(mode, pemasokId);
+                    } else {
+                        const msg = res?.message || 'Gagal menyimpan barang';
+                        window.toastr?.error ? toastr.error(msg) : alert(msg);
+                    }
+                })
+                .fail(function(xhr) {
+                    const msg = xhr.responseJSON?.message || 'Gagal menyimpan barang';
+                    window.toastr?.error ? toastr.error(msg) : alert(msg);
                 })
                 .always(function() {
                     $btn.prop('disabled', false).text('Simpan');
