@@ -7,9 +7,10 @@
     <!-- PWA  -->
 
     <meta name="theme-color" content="#6777ef" />
-    <link rel="apple-touch-icon" href="{{ asset('logo.png') }}">
+    <link rel="icon" type="image/png" href="https://laravel.com/img/logomark.min.svg">
+    <link rel="apple-touch-icon" href="https://laravel.com/img/logomark.min.svg">
     <link rel="manifest" href="{{ asset('/manifest.json') }}">
-    <title>TITLE</title>
+    <title>SmartKeuangan</title>
 
     <!-- Google Font: Source Sans Pro -->
     <link rel="stylesheet" href="{{ asset('lte/font/SourceSans3-Italic-VariableFont_wght.ttf') }}">
@@ -198,8 +199,6 @@
                         User
                     </a>
                 </li>
-
-
             </ul>
 
             <!-- Right navbar links -->
@@ -239,7 +238,7 @@
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{{ route('dashboard.index') }}" class="nav-link {{ request()->routeIs('dashboard.index') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-pie"></i>
                                 <p>Dashboard</p>
                             </a>
@@ -310,13 +309,8 @@
                                         <p>Buku Besar</p>
                                     </a>
                                 </li>
-
                             </ul>
                         </li>
-
-
-
-
                         <li class="nav-item">
                             <a href="{{ route('faktur.index') }}"
                                 class="nav-link {{ request()->routeIs('faktur.*') ? 'active' : '' }}">
@@ -326,34 +320,19 @@
                         </li>
 
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
-                                <i class="nav-icon fas fa-file-contract"></i>
-                                <p>Integrasi Pajak</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link">
-                                <i class="nav-icon fas fa-file-alt"></i>
-                                <p>Report</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{{ route('bep.index') }}" class="nav-link {{ request()->routeIs('bep.index') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-line"></i>
                                 <p>Rekom Break Event</p>
                             </a>
                         </li>
-                        <li class="nav-item">
+                        <!-- <li class="nav-item">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon fas fa-user"></i>
                                 <p>User</p>
                             </a>
-                        </li>
+                        </li> -->
                     </ul>
                 </nav>
-
-
-
             </div>
             <!-- /.sidebar -->
         </aside>

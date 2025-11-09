@@ -1,9 +1,10 @@
 @extends('templates.layout')
 
 @section('breadcrumbs')
-    {{-- breadcrumb kalau perlu --}}
+{{-- breadcrumb kalau perlu --}}
 @endsection
 
+@section('content')
 {{-- ============= CSS Inline agar langsung ter-load ============= --}}
 <style>
     :root {
@@ -179,13 +180,11 @@
         margin-top: .25rem;
     }
 </style>
+<div class="container-fluid bb-wrap">
+    <h4 class="mb-3">Buku Besar</h4>
 
-@section('content')
-    <div class="container-fluid bb-wrap">
-        <h4 class="mb-3">Buku Besar</h4>
-
-        {{-- ===== Ringkasan ===== --}}
-        {{-- <div class="row g-3 mb-2">
+    {{-- ===== Ringkasan ===== --}}
+    {{-- <div class="row g-3 mb-2">
             <div class="col-md-4">
                 <div class="bb-stat">
                     <div class="bb-ico prev"><i class="fas fa-wallet"></i></div>
@@ -215,326 +214,318 @@
             </div>
         </div> --}}
 
-        <div class="row g-3 eq-row">
-            {{-- Input Saldo Awal --}}
-            <div class="col-lg-12">
-                <div class="bb-panel">
-                    <div class="bb-head d-flex justify-content-between align-items-center">
-                        <span>Input Saldo Awal</span>
-                        <div>
-                            @include('buku_besar.list_akun_modal')
-                            <button class="btn btn-light border" data-toggle="modal" data-target="#modalListAkun">Lihat
-                                Daftar Akun</button>
+    <div class="row g-3 eq-row">
+        {{-- Input Saldo Awal --}}
+        <div class="col-lg-12">
+            <div class="bb-panel">
+                <div class="bb-head d-flex justify-content-between align-items-center">
+                    <span>Input Saldo Awal</span>
+                    <div>
+                        @include('buku_besar.list_akun_modal')
+                        <button class="btn btn-light border" data-toggle="modal" data-target="#modalListAkun">Lihat
+                            Daftar Akun</button>
 
-                            <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalAkunBaru"
-                                hidden>
-                                Daftar Akun
-                            </button>
-                            @include('buku_besar.daftar_subakun_modal')
-                            <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalSubAkunBaru"
-                                hidden>
-                                Daftar Sub Akun
-                            </button>
-                            <button class="btn btn-primary text-white" data-toggle="modal" data-target="#modalPemasokBaru">
-                                Tambah Persediaan
-                            </button>
-                            <button class="btn btn-danger text-white" data-toggle="modal" data-target="#modalResetData">
-                                Reset Data
-                            </button>
-                            <button class="btn btn-danger text-white" data-toggle="modal"
-                                data-target="#modalResetTransaksi">
-                                Reset Transaksi
-                            </button>
-                            @include('buku_besar.daftar_akun_modal')
+                        <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalAkunBaru"
+                            hidden>
+                            Daftar Akun
+                        </button>
+                        @include('buku_besar.daftar_subakun_modal')
+                        <button class="btn btn-success text-white" data-toggle="modal" data-target="#modalSubAkunBaru"
+                            hidden>
+                            Daftar Sub Akun
+                        </button>
+                        <button class="btn btn-primary text-white" data-toggle="modal" data-target="#modalPemasokBaru">
+                            Tambah Persediaan
+                        </button>
+                        <button class="btn btn-danger text-white" data-toggle="modal" data-target="#modalResetData">
+                            Reset Data
+                        </button>
+                        <button class="btn btn-danger text-white" data-toggle="modal"
+                            data-target="#modalResetTransaksi">
+                            Reset Transaksi
+                        </button>
+                        @include('buku_besar.daftar_akun_modal')
+                    </div>
+                </div>
+
+                <div class="bb-body">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="kode_akun_id">Kode Akun</label>
+                            <select id="kode_akun_id" name="mst_akun_id" class="form-control" required>
+                                <option value="" disabled selected>Pilih Kode Akun</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="nama_akun_input">Nama Akun</label>
+                            <input type="text" id="nama_akun_input" class="form-control" placeholder="">
                         </div>
                     </div>
 
-                    <div class="bb-body">
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="kode_akun_id">Kode Akun</label>
-                                <select id="kode_akun_id" name="mst_akun_id" class="form-control" required>
-                                    <option value="" disabled selected>Pilih Kode Akun</option>
-                                </select>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="nama_akun_input">Nama Akun</label>
-                                <input type="text" id="nama_akun_input" class="form-control" placeholder="">
-                            </div>
-                        </div>
+                    <!-- ===== Pasangan Sub Akun ↔ Nominal (sejajar) ===== -->
+                    <div class="form-row">
+                        <div class="col-12">
+                            <label class="mb-2 d-block">Tanggal & Nominal</label>
 
-                        <!-- ===== Pasangan Sub Akun ↔ Nominal (sejajar) ===== -->
-                        <div class="form-row">
-                            <div class="col-12">
-                                <label class="mb-2 d-block">Tanggal & Nominal</label>
+                            <!-- container semua pasangan -->
+                            <div id="pair-wrap">
+                                <!-- pasangan pertama -->
+                                <div class="form-row align-items-start bb-pair">
+                                    <div class="col-md-6 mb-2">
+                                        <select class="form-control sub-akun-select" id="sub_akun_id"
+                                            name="sub_akun_id[]" hidden>
+                                            <option value="" hidden selected>Pilih Sub Akun</option>
+                                        </select>
+                                        <input type="date" class="form-control bb-tanggal" name="tanggal[]">
+                                    </div>
 
-                                <!-- container semua pasangan -->
-                                <div id="pair-wrap">
-                                    <!-- pasangan pertama -->
-                                    <div class="form-row align-items-start bb-pair">
-                                        <div class="col-md-6 mb-2">
-                                            <select class="form-control sub-akun-select" id="sub_akun_id"
-                                                name="sub_akun_id[]" hidden>
-                                                <option value="" hidden selected>Pilih Sub Akun</option>
-                                            </select>
-                                            <input type="date" class="form-control bb-tanggal" name="tanggal[]">
-                                        </div>
-
-                                        <div class="col-md-6 mb-2">
-                                            <div class="input-group">
-                                                <input type="text" class="form-control bb-nominal" name="nominal[]"
-                                                    placeholder="Rp">
-                                                <div class="input-group-append">
-                                                    <button type="button" class="btn btn-danger remove-pair">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control bb-nominal" name="nominal[]"
+                                                placeholder="Rp">
+                                            <div class="input-group-append">
+                                                <button type="button" class="btn btn-danger remove-pair">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-
-                                <button id="btnAddDetail" type="button" class="btn btn-outline-primary btn-sm mt-1" hidden>
-                                    Tambah Detail
-                                </button>
                             </div>
+
+                            <button id="btnAddDetail" type="button" class="btn btn-outline-primary btn-sm mt-1" hidden>
+                                Tambah Detail
+                            </button>
                         </div>
+                    </div>
 
 
-                        <div class="form-group mt-3">
-                            <label>Total Saldo</label>
-                            <input type="text" class="form-control" id="bb-total" value="Rp. 0" readonly>
-                        </div>
-                        <div class="text-right">
-                            <button class="btn btn-primary" id="btnSimpanSaldoAwal">Simpan</button>
-                        </div>
+                    <div class="form-group mt-3">
+                        <label>Total Saldo</label>
+                        <input type="text" class="form-control" id="bb-total" value="Rp. 0" readonly>
+                    </div>
+                    <div class="text-right">
+                        <button class="btn btn-primary" id="btnSimpanSaldoAwal">Simpan</button>
                     </div>
                 </div>
             </div>
-
-            {{-- Transaksi --}}
-
-
         </div>
 
-
-
+        {{-- Transaksi --}}
     </div>
-@endsection
 
-{{-- ===== Modal Akun Baru ===== --}}
-<div class="modal fade" id="modalAkunBaru" tabindex="-1" role="dialog" aria-labelledby="modalAkunBaruLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:520px;">
-        <form id="formAkunBaru" class="w-100">
-            @csrf
-            <div class="modal-content">
+    {{-- ===== Modal Akun Baru ===== --}}
+    <div class="modal fade" id="modalAkunBaru" tabindex="-1" role="dialog" aria-labelledby="modalAkunBaruLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:520px;">
+            <form id="formAkunBaru" class="w-100">
+                @csrf
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h6 class="modal-title mb-0" id="modalAkunBaruLabel">Daftar Akun Baru</h6>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
+                        <div class="form-group mb-3">
+                            <label for="kode_akun_baru" class="mb-1" style="font-weight:600;">Kode Akun</label>
+                            <input type="text" class="form-control" id="kode_akun_baru" name="kode_akun"
+                                placeholder="1140" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="nama_akun_baru" class="mb-1" style="font-weight:600;">Nama Akun</label>
+                            <input type="text" class="form-control" id="nama_akun_baru" name="nama_akun"
+                                placeholder="Nama Akun" required>
+                        </div>
+                        <div class="form-group mb-1">
+                            <label for="kategori_akun_baru" class="mb-1" style="font-weight:600;">Kategori</label>
+                            <select id="kategori_akun_baru" name="kategori_akun" class="form-control" required>
+                                <option value="" disabled selected>Pilih Kategori</option>
+                                <option value="Aset Lancar">Aset Lancar</option>
+                                <option value="Aset Tetap">Aset Tetap</option>
+                                <option value="Liabilitas Jangka Pendek">Liabilitas Jangka Pendek</option>
+                                <option value="Liabilitas Jangka Panjang">Liabilitas Jangka Panjang</option>
+                                <option value="Ekuitas">Ekuitas</option>
+                                <option value="Pendapatan">Pendapatan</option>
+                                <option value="Harga Pokok Penjualan">Harga Pokok Penjualan</option>
+                                <option value="Beban Penjualan">Beban Penjualan</option>
+                                <option value="Beban Umum & Administrasi">Beban Umum & Administrasi</option>
+                                <option value="Beban Lain-lain">Beban Lain-lain</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light border" data-dismiss="modal">Tutup</button>
+                        <button type="submit" id="btnSimpanAkunBaru" class="btn btn-primary">Simpan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Tambah Persediaan -->
+    <div class="modal fade" id="modalPemasokBaru" tabindex="-1" role="dialog" aria-labelledby="modalPemasokBaruLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:520px;">
+            <form id="formPemasokBaru" class="w-100">
+                @csrf
+                <div class="modal-content">
+                    <!-- Header -->
+                    <div class="modal-header">
+                        <h6 class="modal-title mb-0" id="modalPemasokBaruLabel">Daftar Pemasok Baru</h6>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
+                        <div class="form-group">
+
+                            <input type="hidden" class="form-control" id="kode_pemasok" name="kode_pemasok" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="nama_pemasok" style="font-weight:600;">Nama Pemasok</label>
+                            <input type="text" class="form-control" id="nama_pemasok" name="nama_pemasok"
+                                placeholder="Nama Pemasok" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="nama_barang" style="font-weight:600;">Nama Barang</label>
+                            <input type="text" class="form-control" id="nama_barang" name="nama_barang"
+                                placeholder="Nama Barang" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="harga_satuan" style="font-weight:600;">Harga Satuan</label>
+                            <input type="text" class="form-control rupiah" id="harga_satuan" name="harga_satuan"
+                                placeholder="Harga Satuan" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="satuan_ukur" style="font-weight:600;">Satuan Ukur</label>
+                            <input type="text" class="form-control" id="satuan_ukur" name="satuan_ukur"
+                                placeholder="Satuan Ukur" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="harga_jual " style="font-weight:600;">Harga Jual</label>
+                            <input type="text" class="form-control rupiah" id="harga_jual" name="harga_jual"
+                                placeholder="Harga Jual" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="stok " style="font-weight:600;">Stok</label>
+                            <input type="number" class="form-control" id="stok" name="stok" placeholder="Stok"
+                                required>
+
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="alamat_pemasok" style="font-weight:600;">Alamat</label>
+                            <textarea class="form-control" id="alamat_pemasok" name="alamat" rows="3" placeholder="Alamat lengkap"></textarea>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="no_hp_pemasok" style="font-weight:600;">No. HP</label>
+                            <input type="text" class="form-control" id="no_hp_pemasok" name="no_hp"
+                                placeholder="08xxxxxxxxxx">
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label class="mb-1" for="email_pemasok" style="font-weight:600;">Email</label>
+                            <input type="email" class="form-control" id="email_pemasok" name="email"
+                                placeholder="email@domain.com">
+                        </div>
+
+                        <div class="form-group mb-1">
+                            <label class="mb-1" for="npwp_pemasok" style="font-weight:600;">NPWP</label>
+                            <input type="text" class="form-control" id="npwp_pemasok" name="npwp"
+                                placeholder="xx.xxx.xxx.x-xxx.xxx">
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light border" data-dismiss="modal">Tutup</button>
+                        <button type="submit" class="btn btn-primary" id="btnSimpanPemasokBaru">Simpan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalResetData" tabindex="-1" role="dialog" aria-labelledby="modalResetDataLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <form method="POST" action="{{ route('buku-besar.reset-data') }}" class="modal-content" id="formResetData">
+                @csrf
                 <div class="modal-header">
-                    <h6 class="modal-title mb-0" id="modalAkunBaruLabel">Daftar Akun Baru</h6>
+                    <h5 class="modal-title" id="modalResetDataLabel">Reset Data?</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
-                    <div class="form-group mb-3">
-                        <label for="kode_akun_baru" class="mb-1" style="font-weight:600;">Kode Akun</label>
-                        <input type="text" class="form-control" id="kode_akun_baru" name="kode_akun"
-                            placeholder="1140" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="nama_akun_baru" class="mb-1" style="font-weight:600;">Nama Akun</label>
-                        <input type="text" class="form-control" id="nama_akun_baru" name="nama_akun"
-                            placeholder="Nama Akun" required>
-                    </div>
-                    <div class="form-group mb-1">
-                        <label for="kategori_akun_baru" class="mb-1" style="font-weight:600;">Kategori</label>
-                        <select id="kategori_akun_baru" name="kategori_akun" class="form-control" required>
-                            <option value="" disabled selected>Pilih Kategori</option>
-                            <option value="Aset Lancar">Aset Lancar</option>
-                            <option value="Aset Tetap">Aset Tetap</option>
-                            <option value="Liabilitas Jangka Pendek">Liabilitas Jangka Pendek</option>
-                            <option value="Liabilitas Jangka Panjang">Liabilitas Jangka Panjang</option>
-                            <option value="Ekuitas">Ekuitas</option>
-                            <option value="Pendapatan">Pendapatan</option>
-                            <option value="Harga Pokok Penjualan">Harga Pokok Penjualan</option>
-                            <option value="Beban Penjualan">Beban Penjualan</option>
-                            <option value="Beban Umum & Administrasi">Beban Umum & Administrasi</option>
-                            <option value="Beban Lain-lain">Beban Lain-lain</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light border" data-dismiss="modal">Tutup</button>
-                    <button type="submit" id="btnSimpanAkunBaru" class="btn btn-primary">Simpan</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
 
-<!-- Modal Tambah Persediaan -->
-<div class="modal fade" id="modalPemasokBaru" tabindex="-1" role="dialog" aria-labelledby="modalPemasokBaruLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:520px;">
-        <form id="formPemasokBaru" class="w-100">
-            @csrf
-            <div class="modal-content">
-                <!-- Header -->
+                <div class="modal-body">
+                    <div class="alert alert-warning mb-0">
+                        Tindakan ini akan <u>menghapus semua isi</u> tabel:
+                        <code>dat_barang, dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
+                            dat_pelanggan, dat_pemasok, dat_transaksi</code><br>
+                        dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
+                        menjadi <b>0</b>.
+                        <br><br>Yakin lanjut?
+                    </div>
+                </div>
+
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
+                    <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalResetTransaksi" tabindex="-1" role="dialog"
+        aria-labelledby="modalResetTransaksiLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <form method="POST" action="{{ route('buku-besar.reset-transaksi') }}" class="modal-content"
+                id="formResetTransaksi">
+                @csrf
                 <div class="modal-header">
-                    <h6 class="modal-title mb-0" id="modalPemasokBaruLabel">Daftar Pemasok Baru</h6>
+                    <h5 class="modal-title" id="modalResetTransaksiLabel">Reset Transaksi?</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
 
-                <!-- Body -->
-                <div class="modal-body" style="padding: 1.25rem 1.25rem .75rem;">
-                    <div class="form-group">
-
-                        <input type="hidden" class="form-control" id="kode_pemasok" name="kode_pemasok" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="nama_pemasok" style="font-weight:600;">Nama Pemasok</label>
-                        <input type="text" class="form-control" id="nama_pemasok" name="nama_pemasok"
-                            placeholder="Nama Pemasok" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="nama_barang" style="font-weight:600;">Nama Barang</label>
-                        <input type="text" class="form-control" id="nama_barang" name="nama_barang"
-                            placeholder="Nama Barang" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="harga_satuan" style="font-weight:600;">Harga Satuan</label>
-                        <input type="text" class="form-control rupiah" id="harga_satuan" name="harga_satuan"
-                            placeholder="Harga Satuan" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="satuan_ukur" style="font-weight:600;">Satuan Ukur</label>
-                        <input type="text" class="form-control" id="satuan_ukur" name="satuan_ukur"
-                            placeholder="Satuan Ukur" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="harga_jual " style="font-weight:600;">Harga Jual</label>
-                        <input type="text" class="form-control rupiah" id="harga_jual" name="harga_jual"
-                            placeholder="Harga Jual" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="stok " style="font-weight:600;">Stok</label>
-                        <input type="number" class="form-control" id="stok" name="stok" placeholder="Stok"
-                            required>
-
-                    </div>
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="alamat_pemasok" style="font-weight:600;">Alamat</label>
-                        <textarea class="form-control" id="alamat_pemasok" name="alamat" rows="3" placeholder="Alamat lengkap"></textarea>
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="no_hp_pemasok" style="font-weight:600;">No. HP</label>
-                        <input type="text" class="form-control" id="no_hp_pemasok" name="no_hp"
-                            placeholder="08xxxxxxxxxx">
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="mb-1" for="email_pemasok" style="font-weight:600;">Email</label>
-                        <input type="email" class="form-control" id="email_pemasok" name="email"
-                            placeholder="email@domain.com">
-                    </div>
-
-                    <div class="form-group mb-1">
-                        <label class="mb-1" for="npwp_pemasok" style="font-weight:600;">NPWP</label>
-                        <input type="text" class="form-control" id="npwp_pemasok" name="npwp"
-                            placeholder="xx.xxx.xxx.x-xxx.xxx">
+                <div class="modal-body">
+                    <div class="alert alert-warning mb-0">
+                        Tindakan ini akan <u>menghapus semua isi</u> tabel:
+                        <code> dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
+                            dat_transaksi</code><br>
+                        dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
+                        menjadi <b>0</b>.
+                        <br><br>Yakin lanjut?
                     </div>
                 </div>
 
-                <!-- Footer -->
+
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light border" data-dismiss="modal">Tutup</button>
-                    <button type="submit" class="btn btn-primary" id="btnSimpanPemasokBaru">Simpan</button>
+                    <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
+                    <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
-</div>
 
-<div class="modal fade" id="modalResetData" tabindex="-1" role="dialog" aria-labelledby="modalResetDataLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <form method="POST" action="{{ route('buku-besar.reset-data') }}" class="modal-content" id="formResetData">
-            @csrf
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalResetDataLabel">Reset Data?</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-
-            <div class="modal-body">
-                <div class="alert alert-warning mb-0">
-                    Tindakan ini akan <u>menghapus semua isi</u> tabel:
-                    <code>dat_barang, dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
-                        dat_pelanggan, dat_pemasok, dat_transaksi</code><br>
-                    dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
-                    menjadi <b>0</b>.
-                    <br><br>Yakin lanjut?
-                </div>
-            </div>
-
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
-                <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalResetTransaksi" tabindex="-1" role="dialog"
-    aria-labelledby="modalResetTransaksiLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <form method="POST" action="{{ route('buku-besar.reset-transaksi') }}" class="modal-content"
-            id="formResetTransaksi">
-            @csrf
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalResetTransaksiLabel">Reset Transaksi?</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-
-            <div class="modal-body">
-                <div class="alert alert-warning mb-0">
-                    Tindakan ini akan <u>menghapus semua isi</u> tabel:
-                    <code> dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
-                        dat_transaksi</code><br>
-                    dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
-                    menjadi <b>0</b>.
-                    <br><br>Yakin lanjut?
-                </div>
-            </div>
-
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light border" data-dismiss="modal">Tidak</button>
-                <button type="submit" class="btn btn-danger" id="btnEksekusiReset">Ya, Reset</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-
-{{-- Flash message --}}
-@if (session('status'))
+    {{-- Flash message --}}
+    @if (session('status'))
     <div class="alert alert-success mt-3">{{ session('status') }}</div>
-@endif
-@if ($errors->any())
+    @endif
+    @if ($errors->any())
     <div class="alert alert-danger mt-3">
         {{ $errors->first() }}
     </div>
-@endif
+    @endif
 
-@push('scripts')
+    @push('scripts')
     <script>
         (function() {
             const $kode = $('#kode_akun_id');
@@ -639,7 +630,6 @@
                         $pairs.find('.sub-akun-select').html(subOptionsHtml).prop('disabled', true);
                     });
             });
-
             recompute();
         })();
     </script>
@@ -963,4 +953,6 @@
             });
         })();
     </script>
-@endpush
+    @endpush
+
+    @endsection

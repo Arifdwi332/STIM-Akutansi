@@ -39,9 +39,8 @@
 
         </div>
     </section>
-@endsection
 
-@push('scripts')
+    @push('scripts')
     <script>
         (function($) {
             // helper
@@ -129,3 +128,7 @@
         })(jQuery);
     </script>
 @endpush
+
+@endsection
+
+

@@ -1,9 +1,10 @@
 @extends('templates.layout')
 
 @section('breadcrumbs')
-    {{-- breadcrumb kalau perlu --}}
+{{-- breadcrumb kalau perlu --}}
 @endsection
 
+@section('content')
 {{-- ============= CSS Inline agar langsung ter-load ============= --}}
 <style>
     :root {
@@ -179,113 +180,112 @@
         margin-top: .25rem;
     }
 </style>
-@section('content')
-    {{-- ===== Tabel bawah ===== --}}
-    <div class="row g-3 mt-1">
-        <div class="col-lg-12">
-            <div class="bb-panel">
-                <div class="bb-head">Jurnal Umum</div>
-                <div class="bb-body">
-                    <div class="bb-tablebox">
-                        <div class="bb-tablebar">
-                            <input id="searchJurnal" type="text" class="form-control" placeholder="Search">
-                        </div>
-                        <div class="table-responsive">
-                            <table id="tblJurnal" class="table table-sm table-hover w-100">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Tanggal</th>
-                                        <th>Keterangan</th>
-                                        <th>Nama Akun</th>
-                                        <th class="text-success">Debet</th>
-                                        <th class="text-danger">Kredit</th>
-                                    </tr>
-                                </thead>
-                            </table>
-                        </div>
-                        <div class="bb-footline">
-                            <small class="text-muted">Jurnal periode berjalan</small>
-                            <div id="pgJurnal"></div>
-                        </div>
+{{-- ===== Tabel bawah ===== --}}
+<div class="row g-3 mt-1">
+    <div class="col-lg-12">
+        <div class="bb-panel">
+            <div class="bb-head">Jurnal Umum</div>
+            <div class="bb-body">
+                <div class="bb-tablebox">
+                    <div class="bb-tablebar">
+                        <input id="searchJurnal" type="text" class="form-control" placeholder="Search">
+                    </div>
+                    <div class="table-responsive">
+                        <table id="tblJurnal" class="table table-sm table-hover w-100">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Keterangan</th>
+                                    <th>Nama Akun</th>
+                                    <th class="text-success">Debet</th>
+                                    <th class="text-danger">Kredit</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <div class="bb-footline">
+                        <small class="text-muted">Jurnal periode berjalan</small>
+                        <div id="pgJurnal"></div>
                     </div>
                 </div>
             </div>
         </div>
-
-
     </div>
-@endsection
+</div>
+
 @push('scripts')
-    <script>
-        (function() {
-            const rp = n => {
-                n = Number(n || 0);
-                return 'Rp. ' + n.toLocaleString('id-ID');
-            };
+<script>
+    (function() {
+        const rp = n => {
+            n = Number(n || 0);
+            return 'Rp. ' + n.toLocaleString('id-ID');
+        };
 
-            // ====== JURNAL UMUM ======
-            function loadJurnal(page = 1) {
-                const q = $('#searchJurnal').val() || '';
-                $.getJSON('/buku_besar/get_jurnal', {
-                    search: q,
-                    page,
-                    per_page: 20
-                }, function(res) {
-                    if ($('#tblJurnal tbody').length === 0) {
-                        $('#tblJurnal').append('<tbody></tbody>');
-                    }
-                    const $body = $('#tblJurnal tbody').empty();
+        // ====== JURNAL UMUM ======
+        function loadJurnal(page = 1) {
+            const q = $('#searchJurnal').val() || '';
+            $.getJSON('/buku_besar/get_jurnal', {
+                search: q,
+                page,
+                per_page: 20
+            }, function(res) {
+                if ($('#tblJurnal tbody').length === 0) {
+                    $('#tblJurnal').append('<tbody></tbody>');
+                }
+                const $body = $('#tblJurnal tbody').empty();
 
-                    (res.data || []).forEach(r => {
-                        $body.append(
-                            `<tr>
+                (res.data || []).forEach(r => {
+                    $body.append(
+                        `<tr>
                         <td>${r.tanggal ?? ''}</td>
                         <td>${r.keterangan ?? ''}</td>
                         <td>${r.nama_akun ?? ''}</td>
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
                     </tr>`
-                        );
-                    });
-
-                    $('#pgJurnal').text(`Total: ${res.total} | Hal: ${res.page}`);
+                    );
                 });
-            }
 
-            $('#searchJurnal').on('input', () => loadJurnal(1));
-            loadJurnal();
+                $('#pgJurnal').text(`Total: ${res.total} | Hal: ${res.page}`);
+            });
+        }
 
-            // ====== BUKU BESAR ======
-            function loadBuku(page = 1) {
-                const q = $('#searchBuku').val() || '';
-                $.getJSON('/buku_besar/get_jurnal', {
-                    search: q,
-                    page,
-                    per_page: 20
-                }, function(res) {
-                    if ($('#tblBuku tbody').length === 0) {
-                        $('#tblBuku').append('<tbody></tbody>');
-                    }
-                    const $body = $('#tblBuku tbody').empty();
+        $('#searchJurnal').on('input', () => loadJurnal(1));
+        loadJurnal();
 
-                    (res.data || []).forEach(r => {
-                        $body.append(
-                            `<tr>
+        // ====== BUKU BESAR ======
+        function loadBuku(page = 1) {
+            const q = $('#searchBuku').val() || '';
+            $.getJSON('/buku_besar/get_jurnal', {
+                search: q,
+                page,
+                per_page: 20
+            }, function(res) {
+                if ($('#tblBuku tbody').length === 0) {
+                    $('#tblBuku').append('<tbody></tbody>');
+                }
+                const $body = $('#tblBuku tbody').empty();
+
+                (res.data || []).forEach(r => {
+                    $body.append(
+                        `<tr>
                         <td>${r.nama_akun ?? ''}</td>
                         <td>${r.tanggal ?? ''}</td>
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
                         <td>${rp(r.saldo)}</td>
                     </tr>`
-                        );
-                    });
-
-                    $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);
+                    );
                 });
-            }
 
-            $('#searchBuku').on('input', () => loadBuku(1));
-            loadBuku();
-        })();
-    </script>
+                $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);
+            });
+        }
+
+        $('#searchBuku').on('input', () => loadBuku(1));
+        loadBuku();
+    })();
+</script>
 @endpush
+
+@endsection
