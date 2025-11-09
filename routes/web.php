@@ -5,6 +5,8 @@ use App\Http\Controllers\BukuBesarController;
 use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\LaporanKeuanganController;
 use App\Http\Controllers\FakturController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BepController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -16,18 +18,11 @@ use App\Http\Controllers\FakturController;
 |
 */
 
-Route::get('/', function () {
-    return view('index');
-});
-
-
+Route::get('/', [DashboardController::class, 'index'])->name('dashboard.index');
 
 Route::get('/buku_besar', [BukuBesarController::class, 'index'])->name('buku_besar.index');
-
 Route::get('/buku_besar/mst_akun', [BukuBesarController::class, 'listMstAkun'])->name('buku_besar.mst_akun');
-
 Route::post('/buku_besar/sub_akun', [BukuBesarController::class, 'storeSubAkun'])->name('buku_besar.sub_akun');
-
 Route::get('/buku_besar/jurnal', [BukuBesarController::class,'jurnalData'])->name('buku_besar.jurnal');
 Route::get('/buku_besar/detail', [BukuBesarController::class,'bukuBesarData'])->name('buku_besar.detail');
 
@@ -38,7 +33,7 @@ Route::post('/buku_besar/saldo-awal', [BukuBesarController::class, 'storeSaldoAw
 Route::post('/buku_besar/storetransaksi', [BukuBesarController::class, 'storetransaksi'])->name('transaksi.store');
 
 
-Route::get('buku_besar/get_jurnal',     [BukuBesarController::class, 'getJurnal'])->name('getJurnal');
+Route::get('buku_besar/get_jurnal', [BukuBesarController::class, 'getJurnal'])->name('getJurnal');
 Route::get('buku_besar/get_buku_besar', [BukuBesarController::class, 'getBukuBesar'])->name('getBukuBesar');
 Route::get('buku_besar/list_pemasok', [BukuBesarController::class, 'listPemasok'])->name('listPemasok');
 Route::get('buku_besar/list_pelanggan', [BukuBesarController::class, 'listPelanggan'])->name('listPelanggan');
@@ -46,16 +41,13 @@ Route::post('buku_besar/store_pemasok', [BukuBesarController::class, 'storePemas
 Route::post('/buku-besar/reset-data', [BukuBesarController::class, 'resetData'])->name('buku-besar.reset-data');
 Route::post('/buku-besar/reset-transaksi', [BukuBesarController::class, 'resetTransaksi'])->name('buku-besar.reset-transaksi');
 
-
-
 Route::prefix('inventaris')->name('inventaris.')->group(function () {
-    Route::get('/',                [TransaksiController::class, 'index'])->name('index');
+    Route::get('/', [TransaksiController::class, 'index'])->name('index');
+    Route::get('/barang', [TransaksiController::class, 'barangList'])->name('barang');      
+    Route::get('/pelanggan', [TransaksiController::class, 'pelangganList'])->name('pelanggan');
+    Route::get('/next_no', [TransaksiController::class, 'nextNo'])->name('next_no');         
 
-    Route::get('/barang',          [TransaksiController::class, 'barangList'])->name('barang');      
-    Route::get('/pelanggan',       [TransaksiController::class, 'pelangganList'])->name('pelanggan');
-    Route::get('/next_no',         [TransaksiController::class, 'nextNo'])->name('next_no');         
-
-    Route::post('/store',          [TransaksiController::class, 'store'])->name('store');     
+    Route::post('/store', [TransaksiController::class, 'store'])->name('store');     
     Route::post('/pelanggan/store', [TransaksiController::class, 'storePelanggan'])->name('pelanggan.store');
     Route::post('/pemasok/store', [TransaksiController::class, 'storePemasok'])->name('pemasok.store');   
     Route::post('/barang/store', [TransaksiController::class, 'storeBarang'])->name('barang.store');  
@@ -74,19 +66,12 @@ Route::prefix('inventaris')->name('inventaris.')->group(function () {
 
 Route::prefix('laporan_keuangan')->name('laporan_keuangan.')->group(function () {
     Route::get('/', [LaporanKeuanganController::class, 'index'])->name('index');
-    Route::get('/get_laba_rugi', [LaporanKeuanganController::class, 'getLabaRugi'])->name('get_laba_rugi');
+    Route::get('/get_laba_rugi',[LaporanKeuanganController::class, 'getLabaRugi'])->name('get_laba_rugi');
 
     Route::get('/get_neraca', [LaporanKeuanganController::class, 'getNeraca'])->name('get_neraca');
     Route::get('/bukbes', [LaporanKeuanganController::class, 'bukbes'])->name('bukbes');
     Route::get('/jurnal', [LaporanKeuanganController::class, 'jurnal'])->name('jurnal');
-
-
 });
-
-
-
-
-
 
 Route::prefix('faktur')->name('faktur.')->group(function () {
     Route::get('/', [FakturController::class, 'index'])->name('index');
@@ -95,6 +80,10 @@ Route::prefix('faktur')->name('faktur.')->group(function () {
 
     Route::get('/{no}/cetak', [FakturController::class, 'print'])->name('cetak');
     Route::get('/{no}/export/pdf', [FakturController::class, 'exportPdf'])->name('export.pdf');
+});
+
+Route::prefix('bep')->name('bep.')->group(function () {
+    Route::get('/', [BepController::class, 'index'])->name('index');
 });
 
 
