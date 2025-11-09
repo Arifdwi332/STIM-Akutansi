@@ -101,7 +101,7 @@
                                     <select id="tipe_transaksi" class="custom-select">
                                         <!-- Pembayaran Operasional -->
                                         <option value="Bayar Gaji">Bayar Gaji</option>
-                                        <option value="Bayar Listrik">Bayar Listrik</option>
+
                                         <option value="Bayar Listrik/Telepon/Internet/Air">Bayar
                                             Listrik/Telepon/Internet/Air</option>
                                         <option value="Bayar Iklan/Promosi">Bayar Iklan/Promosi</option>

@@ -735,11 +735,39 @@ public function storetransaksi(Request $request)
             //         ->decrement('saldo_berjalan', $nominal);
             // }
            
-            if (in_array($tipe, ['Bayar Gaji', 'Bayar Listrik'], true)) {
+           $tipeSaldoKeluar = [
+                'Bayar Bunga Bank',
+                'Bayar Pajak',
+                'Bayar Gaji',
+                'Bayar Iklan/Promosi',        
+                'Bayar Iklan/promosi',
+                'Bayar Transportasi',
+                'Bayar Transportasi (Ongkir, BBM, dll)', 
+                'Bayar Sewa Ruko/Outlet/dll',
+                'Bayar Listrik',
+                'Bayar Listrik/Telepon/Internet/Air',    
+                'Bayar Pemeliharaan',
+                'Bayar Pemeliharaan (Servis, dll)',      
+                'Bayar Lain-lain',
+            ];
+
+            if (in_array($tipe, $tipeSaldoKeluar, true)) {
                 DB::table('mst_akun')
                     ->where('id', 17)
                     ->lockForUpdate()
                     ->decrement('saldo_berjalan', $nominal);
+            }
+
+             $tipeSaldoMasuk = [
+                'Pendapatan Bunga',
+               
+            ];
+
+            if (in_array($tipe, $tipeSaldoMasuk, true)) {
+                DB::table('mst_akun')
+                    ->where('id', 17)
+                    ->lockForUpdate()
+                    ->increment('saldo_berjalan', $nominal);
             }
             
         }

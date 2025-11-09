@@ -417,7 +417,9 @@
         $('#formBarangBaru').on('submit', function(e) {
             e.preventDefault();
             const $btn = $('#btnSimpanBarangBaru').prop('disabled', true).text('Menyimpan...');
-
+            $(this).find('.rupiah').each(function() {
+                $(this).val(parseRupiah($(this).val()));
+            });
             const payload = {
                 pemasok_id: $('#pemasok_id').val(),
                 kode_pemasok: $('#kode_pemasok').val(),

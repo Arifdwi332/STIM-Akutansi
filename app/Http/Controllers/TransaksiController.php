@@ -876,9 +876,28 @@ private function insertJurnalSimple(
             ->update(['saldo_berjalan' => $saldoKreditAfter, 'updated_at' => $now]);
     });
 }    
-public function datatableTransaksi()
+public function datatableTransaksi(Request $r) // [CHANGES] terima Request
 {
-    $agg = DB::table('dat_transaksi as t')
+    // [CHANGES] Ambil parameter filter dari querystring
+    $tglAwal = $r->query('tgl_awal');
+    $tglAkhir = $r->query('tgl_akhir');
+    $tipeParam = $r->query('tipe'); // contoh: "Penjualan" / "Inventaris" / 1 / 2
+
+    // [CHANGES] Map tipeParam -> jenis_transaksi (1=Penjualan, 2=Inventaris)
+    $jenisFilter = null;
+    if ($tipeParam !== null && $tipeParam !== '') {
+        if (is_numeric($tipeParam)) {
+            $jenisFilter = (int) $tipeParam;
+        } else {
+            $t = strtolower(trim($tipeParam));
+            if (in_array($t, ['penjualan', 'jual'], true))     $jenisFilter = 1;
+            if (in_array($t, ['inventaris', 'pembelian', 'beli'], true)) $jenisFilter = 2;
+        }
+        if (!in_array($jenisFilter, [1, 2], true)) $jenisFilter = null;
+    }
+
+    // [CHANGES] Bangun base query agar filter diaplikasikan SEBELUM agregasi
+    $base = DB::table('dat_transaksi as t')
         ->select(
             't.no_transaksi',
             DB::raw('MIN(t.tgl) as tgl'),
@@ -887,8 +906,23 @@ public function datatableTransaksi()
             DB::raw('SUM(t.jml_barang) as qty'),
             DB::raw('SUM(t.total) as total')
         )
-        ->whereIn('t.jenis_transaksi', [1, 2])
-        ->groupBy('t.no_transaksi');
+        ->whereIn('t.jenis_transaksi', [1, 2]);
+
+    // [CHANGES] Terapkan filter tanggal (inklusif)
+    if (!empty($tglAwal)) {
+        $base->whereDate('t.tgl', '>=', $tglAwal);
+    }
+    if (!empty($tglAkhir)) {
+        $base->whereDate('t.tgl', '<=', $tglAkhir);
+    }
+
+    // [CHANGES] Terapkan filter tipe jika ada
+    if (!is_null($jenisFilter)) {
+        $base->where('t.jenis_transaksi', $jenisFilter);
+    }
+
+    // Lanjut agregasi (tetap seperti sebelumnya)
+    $agg = $base->groupBy('t.no_transaksi');
 
     $x = DB::query()->fromSub($agg, 'x')
         ->leftJoin('dat_pelanggan as pl', function($j){
@@ -917,7 +951,7 @@ public function datatableTransaksi()
         ->orderByDesc('x.no_transaksi')
         ->get();
 
-   $rows = $x->map(function($r){
+    $rows = $x->map(function($r){
         return [
             'tgl'           => $r->tgl,
             'tipe_label'    => ((int)$r->jenis_transaksi === 1 ? 'Penjualan' : 'Inventaris'),
@@ -931,7 +965,6 @@ public function datatableTransaksi()
 
     return response()->json(['data' => $rows]);
 }
-
 public function datatableInventaris()
 {
     $rows = DatBarangModel::query()
@@ -1131,5 +1164,7 @@ public function nominalpiutang(Request $r)
 
     return response()->json(['ok' => true, 'nominal' => (float)$nominal]);
 }
+
+
 
 }

@@ -238,7 +238,8 @@
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
                         <li class="nav-item">
-                            <a href="{{ route('dashboard.index') }}" class="nav-link {{ request()->routeIs('dashboard.index') ? 'active' : '' }}">
+                            <a href="{{ route('dashboard.index') }}"
+                                class="nav-link {{ request()->routeIs('dashboard.index') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-pie"></i>
                                 <p>Dashboard</p>
                             </a>
@@ -299,7 +300,7 @@
                                     <a href="{{ route('laporan_keuangan.jurnal') }}"
                                         class="nav-link {{ request()->routeIs('laporan_keuangan.jurnal') ? 'active' : '' }}">
                                         <i class="far fa-circle nav-icon"></i>
-                                        <p>Jurnal Umum</p>
+                                        <p>Ringkasan Jurnal</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -320,7 +321,8 @@
                         </li>
 
                         <li class="nav-item">
-                            <a href="{{ route('bep.index') }}" class="nav-link {{ request()->routeIs('bep.index') ? 'active' : '' }}">
+                            <a href="{{ route('bep.index') }}"
+                                class="nav-link {{ request()->routeIs('bep.index') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-line"></i>
                                 <p>Rekom Break Event</p>
                             </a>
