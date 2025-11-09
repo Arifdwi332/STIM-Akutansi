@@ -61,8 +61,15 @@ Route::prefix('inventaris')->name('inventaris.')->group(function () {
     Route::post('/barang/store', [TransaksiController::class, 'storeBarang'])->name('barang.store');  
     Route::get('/parties', [TransaksiController::class, 'getParties'])->name('parties');
     Route::get('/barang', [TransaksiController::class, 'barangList'])->name('barang');
-    Route::get('/transaksi', [TransaksiController::class, 'datatableTransaksi'])
-    ->name('dt.transaksi');
+    Route::get('/transaksi', [TransaksiController::class, 'datatableTransaksi'])->name('dt.transaksi');;
+    Route::get('/utang/suppliers',    [TransaksiController::class, 'suppliers']);
+    Route::get('/utang/by-supplier', [TransaksiController::class, 'bySupplier'])->name('utang');
+    Route::get('/utang/nominal', [TransaksiController::class, 'nominal'])->name('nominal');
+
+    Route::get('/piutang/customers', [TransaksiController::class, 'customers']);
+    Route::get('/piutang/by-customer', [TransaksiController::class, 'byCustomer']);
+    Route::get('/piutang/nominalpiutang', [TransaksiController::class, 'nominalpiutang']);
+
 
     Route::get('/inventaris', [TransaksiController::class, 'datatableInventaris'])->name('dt.inventaris');
     Route::get('/barang-by-pemasok', [TransaksiController::class, 'getBarangByPemasok'])->name('barangByPemasok');

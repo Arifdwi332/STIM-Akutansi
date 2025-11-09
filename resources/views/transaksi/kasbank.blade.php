@@ -117,6 +117,7 @@
                                         <!-- Utang & Bunga -->
                                         <option value="Bayar Utang Bank">Bayar Utang Bank</option>
                                         <option value="Bayar Utang Usaha">Bayar Utang Usaha</option>
+                                        <option value="Bayar Piutang Usaha">Bayar Piutang Usaha</option>
                                         <option value="Bayar Utang Lainnya">Bayar Utang Lainnya</option>
                                         <option value="Bayar Bunga Bank">Bayar Bunga Bank</option>
 
@@ -154,6 +155,40 @@
                                         placeholder="Rp. xx,xxx,xxx">
                                 </div>
                             </div>
+
+                            <div id="rowUtangUsaha" class="form-row" style="display:none;">
+                                <div class="form-group col-md-6">
+                                    <label>Kode Pemasok</label>
+                                    <select id="kode_pemasok" class="custom-select">
+                                        <option value="" selected disabled>Pilih Pemasok</option>
+                                    </select>
+                                    <small class="form-text text-muted">Pilih kode pemasok, lalu pilih No Transaksi.</small>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>No Transaksi</label>
+                                    <select id="no_transaksi_utang" class="custom-select">
+                                        <option value="" selected disabled>Pilih No Transaksi</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="rowPiutangUsaha" class="form-row" style="display:none;">
+                                <div class="form-group col-md-6">
+                                    <label>Pelanggan</label>
+                                    <select id="pelanggan_id" class="custom-select">
+                                        <option value="" selected disabled>Pilih Pelanggan</option>
+                                    </select>
+                                    <small class="form-text text-muted">Pilih pelanggan, lalu pilih No Transaksi
+                                        piutang.</small>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>No Transaksi</label>
+                                    <select id="no_transaksi_piutang" class="custom-select">
+                                        <option value="" selected disabled>Pilih No Transaksi</option>
+                                    </select>
+                                </div>
+                            </div>
+
+
 
                             <!-- Akun Debet/Kredit: hanya tampil untuk 'Manual' -->
                             <div id="rowManualAccounts" class="form-row" style="display:none;">
@@ -211,23 +246,198 @@
             const $tipe = $('#tipe_transaksi');
             const $deb = $('#akun_debet_id');
             const $kred = $('#akun_kredit_id');
+            const $nom = $('#trx_nominal');
+            const $kp = $('#kode_pemasok');
+            const $noUt = $('#no_transaksi_utang');
+
+
 
             // helper: ubah string rupiah ke angka
             function toNumber(v) {
                 return parseInt(String(v || '').replace(/[^\d-]/g, ''), 10) || 0;
             }
 
-            // toggle field akun manual
+            function formatRupiah(n) {
+                n = Number(n || 0);
+                return 'Rp ' + n.toLocaleString('id-ID');
+            }
+            let suppliersLoaded = false;
+
+            function loadKodePemasokList(force = false) {
+                if (suppliersLoaded && !force) return $.Deferred().resolve();
+                return $.get('/inventaris/utang/suppliers')
+                    .done(function(res) {
+                        $kp.empty().append('<option value="" disabled selected>Pilih Pemasok</option>');
+                        if (res?.ok && Array.isArray(res.data) && res.data.length) {
+                            res.data.forEach(function(row) {
+                                const label = row.kode_pemasok + (row.nama_pemasok ? (' - ' + row
+                                    .nama_pemasok) : '');
+                                $kp.append($('<option/>').val(row.kode_pemasok).text(label));
+                            });
+                            suppliersLoaded = true;
+                        } else {
+                            $kp.append('<option value="" disabled>Tidak ada pemasok</option>');
+                        }
+                    })
+                    .fail(function() {
+                        $kp.empty().append('<option value="" disabled>Gagal memuat pemasok</option>');
+                    });
+            }
+
+            let customersLoaded = false;
+            const $plg = $('#pelanggan_id');
+            const $noP = $('#no_transaksi_piutang');
+
+            function loadPelangganList(force = false) {
+                if (customersLoaded && !force) return $.Deferred().resolve();
+                return $.get('/inventaris/piutang/customers')
+                    .done(function(res) {
+                        $plg.empty().append('<option value="" disabled selected>Pilih Pelanggan</option>');
+                        if (res?.ok && Array.isArray(res.data) && res.data.length) {
+                            res.data.forEach(function(row) {
+                                const label = row.nama_pelanggan || ('ID#' + row.id_pelanggan);
+                                $plg.append($('<option/>').val(row.id_pelanggan).text(label));
+                            });
+                            customersLoaded = true;
+                        } else {
+                            $plg.append('<option value="" disabled>Tidak ada pelanggan</option>');
+                        }
+                    })
+                    .fail(function() {
+                        $plg.empty().append('<option value="" disabled>Gagal memuat pelanggan</option>');
+                    });
+            }
+
             $tipe.on('change', function() {
-                if ($(this).val() === 'Manual') {
+                const val = $(this).val();
+
+                // Manual
+                if (val === 'Manual') {
                     $('#rowManualAccounts').show();
                 } else {
                     $('#rowManualAccounts').hide();
                     $deb.val('');
                     $kred.val('');
                 }
+
+                // Utang Usaha (supplier)
+                if (val === 'Bayar Utang Usaha') {
+                    $('#rowUtangUsaha').show();
+                    $nom.val('').prop('readonly', true);
+                    loadKodePemasokList().done(function() {
+                        if ($kp.val()) $kp.trigger('change');
+                    });
+                } else {
+                    $('#rowUtangUsaha').hide();
+                    $kp.val('');
+                    $noUt.empty().append('<option value="" disabled selected>Pilih No Transaksi</option>');
+                    $nom.prop('readonly', false);
+                }
+
+                // Piutang Usaha (pelanggan)
+                if (val === 'Bayar Piutang Usaha') {
+                    $('#rowPiutangUsaha').show();
+                    $nom.val('').prop('readonly', true);
+                    loadPelangganList().done(function() {
+                        if ($plg.val()) $plg.trigger('change');
+                    });
+                } else {
+                    $('#rowPiutangUsaha').hide();
+                    $plg.val('');
+                    $noP.empty().append('<option value="" disabled selected>Pilih No Transaksi</option>');
+                    $nom.prop('readonly', false);
+                }
             });
 
+
+            let fetchListTimer = null;
+            $kp.on('change', function() {
+                const kode = String($(this).val() || '').trim();
+                $noUt.empty().append('<option value="" disabled selected>Memuat...</option>');
+                if (!kode) {
+                    $noUt.empty().append('<option value="" disabled selected>Pilih No Transaksi</option>');
+                    return;
+                }
+                $.get('/inventaris/utang/by-supplier', {
+                        kode_pemasok: kode
+                    })
+                    .done(function(res) {
+                        $noUt.empty().append(
+                            '<option value="" disabled selected>Pilih No Transaksi</option>');
+                        if (res?.ok && Array.isArray(res.data) && res.data.length) {
+                            res.data.forEach(function(row) {
+                                // row: {no_transaksi, nominal, tanggal}
+                                const label = row.no_transaksi + ' • ' + formatRupiah(row
+                                    .nominal) + ' • ' + (row.tanggal || '');
+                                $noUt.append(
+                                    $('<option/>')
+                                    .val(row.no_transaksi)
+                                    .text(row.no_transaksi)
+                                    .attr('data-nominal', row
+                                        .nominal)
+                                    .attr('data-tanggal', row.tanggal || '')
+                                    .attr('title', (row.tanggal ||
+                                        ''))
+                                );
+                            });
+                        } else {
+                            $noUt.append('<option value="" disabled>Tidak ada data</option>');
+                        }
+                    })
+                    .fail(function() {
+                        $noUt.empty().append('<option value="" disabled>Gagal memuat</option>');
+                    });
+            });
+
+            $noUt.on('change', function() {
+                const n = $(this).find(':selected').data('nominal');
+                if (typeof n !== 'undefined') $nom.val(formatRupiah(n));
+            });
+
+
+            $plg.on('change', function() {
+                const idp = String($(this).val() || '').trim();
+                $noP.empty().append('<option value="" disabled selected>Memuat...</option>');
+                if (!idp) {
+                    $noP.empty().append('<option value="" disabled selected>Pilih No Transaksi</option>');
+                    return;
+                }
+
+                $.get('/inventaris/piutang/by-customer', {
+                        id_pelanggan: idp
+                    })
+                    .done(function(res) {
+                        $noP.empty().append(
+                            '<option value="" disabled selected>Pilih No Transaksi</option>');
+                        if (res?.ok && Array.isArray(res.data) && res.data.length) {
+                            res.data.forEach(function(row) {
+                                // row: {no_transaksi, nominal, tanggal}
+                                const label = row.no_transaksi + ' • ' + formatRupiah(row
+                                    .nominal) + ' • ' + (row.tanggal || '');
+                                $noP.append(
+                                    $('<option/>')
+                                    .val(row.no_transaksi)
+                                    .text(row
+                                        .no_transaksi
+                                    ) // hanya nomor yg ditampilkan (sesuai request)
+                                    .attr('data-nominal', row.nominal)
+                                    .attr('title', label)
+                                );
+                            });
+                        } else {
+                            $noP.append('<option value="" disabled>Tidak ada data</option>');
+                        }
+                    })
+                    .fail(function() {
+                        $noP.empty().append('<option value="" disabled>Gagal memuat</option>');
+                    });
+            });
+
+            $noP.on('change', function() {
+                const n = $(this).find(':selected').data('nominal');
+                if (typeof n !== 'undefined') $nom.val(formatRupiah(n));
+            });
+            $tipe.trigger('change');
             // tombol simpan
             $('#btnSimpanTransaksi').on('click', function(e) {
                 e.preventDefault();
@@ -245,6 +455,7 @@
                     'Tanggal wajib diisi'));
                 if (!nominal) return (toastr?.error?.('Nominal tidak valid') || alert(
                     'Nominal tidak valid'));
+
                 if (tipe === 'Manual') {
                     if (!akunDebet || !akunKredit)
                         return (toastr?.error?.('Pilih akun debet & akun kredit') || alert(
@@ -254,17 +465,34 @@
                             'Akun debet & kredit tidak boleh sama'));
                 }
 
+                const payload = {
+                    tipe,
+                    nominal,
+                    tanggal,
+                    keterangan,
+                    akun_debet_id: akunDebet,
+                    akun_kredit_id: akunKredit,
+                    _token: "{{ csrf_token() }}"
+                };
+
+                if (tipe === 'Bayar Utang Usaha') {
+                    payload.kode_pemasok = $('#kode_pemasok').val();
+                    payload.no_transaksi = $('#no_transaksi_utang').val();
+                    if (!payload.kode_pemasok || !payload.no_transaksi) {
+                        toastr?.error?.('Pilih Kode Pemasok & No Transaksi');
+                        return;
+                    }
+                }
+                if (tipe === 'Bayar Piutang Usaha') {
+                    payload.id_pelanggan = $('#pelanggan_id').val();
+                    payload.no_transaksi = $('#no_transaksi_piutang').val();
+                    if (!payload.id_pelanggan || !payload.no_transaksi) return toastr?.error?.(
+                        'Pilih Pelanggan & No Transaksi');
+                }
+
                 const $btn = $(this).prop('disabled', true).text('Menyimpan...');
 
-                $.post('/buku_besar/storetransaksi', {
-                        tipe,
-                        nominal,
-                        tanggal,
-                        keterangan,
-                        akun_debet_id: akunDebet,
-                        akun_kredit_id: akunKredit,
-                        _token: "{{ csrf_token() }}"
-                    })
+                $.post('/buku_besar/storetransaksi', payload)
                     .done(function(res) {
                         if (res?.ok) {
                             toastr?.success?.('Transaksi berhasil disimpan') || alert(
@@ -274,6 +502,12 @@
                             if (tipe === 'Manual') {
                                 $deb.val('').trigger('change');
                                 $kred.val('').trigger('change');
+                            }
+                            if (tipe === 'Bayar Utang Usaha') {
+                                $('#kode_pemasok').val('');
+                                $('#no_transaksi_utang').empty().append(
+                                    '<option value="" selected disabled>Pilih No Transaksi</option>'
+                                );
                             }
                         } else {
                             const msg = res?.message || 'Gagal menyimpan transaksi';
@@ -286,8 +520,10 @@
                     })
                     .always(function() {
                         $btn.prop('disabled', false).text('Simpan');
+                        $tipe.trigger('change');
                     });
             });
+
         });
     </script>
 @endpush

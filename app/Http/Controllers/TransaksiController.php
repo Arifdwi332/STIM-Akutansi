@@ -495,6 +495,7 @@ class TransaksiController extends Controller
         'items.*.harga'     => ['required','numeric','min:0'],
         'items.*.subtotal'  => ['nullable','numeric','min:0'],
         'items.*.harga_mentah' => ['nullable','numeric','min:0'],
+        'kode_pemasok'   => ['nullable','string','max:50'],
 
     ]);
 
@@ -725,6 +726,36 @@ class TransaksiController extends Controller
                     ->decrement('saldo_berjalan', (float) $hargaSatuanTotal);
             }
             
+            if ($jenisCode === 2 && $tipePembayaran === 2) {
+            $kodePemasok = $request->input('kode_pemasok'); // opsional dari form
+            if (!$kodePemasok && $idKontak) {
+               
+                $kodePemasok = DB::table('dat_pemasok')
+                    ->where('id_pemasok', $idKontak)
+                    ->value('kode_pemasok');
+            }
+
+            DB::table('dat_utang')->insert([
+                'kode_pemasok' => (string) ($kodePemasok ?? ''), 
+                'no_transaksi' => $noTransaksi,
+                'nominal'      => (float) $grandTotal,
+                'created_by'   => (int) (auth()->id() ?? 0),
+                'tanggal'      => $tglSql,
+            ]);
+        }
+        if ($jenisCode === 1 && $tipePembayaran === 2) { 
+            $idPelanggan = (int) ($request->input('pelanggan_id') ?? $idKontak ?? 0);
+
+            DB::table('dat_piutang')->insert([
+                'id_pelanggan' => $idPelanggan,
+                'no_transaksi' => $noTransaksi,
+                'nominal'      => (float) $grandTotal,
+                'status'       => 0, // 0 = Belum Lunas
+                'created_by'   => (int) (auth()->id() ?? 0),
+                'tanggal'      => $tglSql,
+            ]);
+        }
+
         DB::commit();
         return response()->json([
             'ok' => true,
@@ -994,5 +1025,111 @@ public function updateBarang(Request $r)
     return response()->json(['ok' => true, 'message' => 'Data barang berhasil diperbarui']);
 }
 
+public function suppliers()
+{
+    $rows = \DB::table('dat_utang as u')
+        ->leftJoin('dat_pemasok as p', 'p.kode_pemasok', '=', 'u.kode_pemasok')
+        ->whereNotNull('u.kode_pemasok')
+        ->where('u.kode_pemasok', '!=', '')
+        ->where('u.status', 0) // hanya yang belum lunas
+        ->select(
+            'u.kode_pemasok',
+            \DB::raw('COALESCE(p.nama_pemasok, "") as nama_pemasok')
+        )
+        ->distinct()
+        ->orderBy('u.kode_pemasok')
+        ->get();
+
+    return response()->json(['ok' => true, 'data' => $rows]);
+}
+
+public function bySupplier(Request $r)
+{
+    $r->validate(['kode_pemasok' => 'required|string|max:50']);
+
+    $rows = \DB::table('dat_utang')
+        ->select(
+            'no_transaksi',
+            \DB::raw('SUM(nominal) AS nominal'),
+            \DB::raw('MIN(tanggal) AS tanggal')
+        )
+        ->where('kode_pemasok', $r->kode_pemasok)
+        ->where('status', 0) // hanya yang belum lunas
+        ->groupBy('no_transaksi')
+        ->orderByDesc(\DB::raw('MIN(tanggal)'))
+        ->limit(50)
+        ->get();
+
+    return response()->json(['ok' => true, 'data' => $rows]);
+}
+public function nominal(Request $r)
+{
+    $r->validate([
+        'kode_pemasok' => 'required|string|max:50',
+        'no_transaksi' => 'required|string|max:50',
+    ]);
+
+    $nominal = \DB::table('dat_utang')
+        ->where('kode_pemasok', $r->kode_pemasok)
+        ->where('no_transaksi', $r->no_transaksi)
+        ->where('status', 0) // hanya yang belum lunas
+        ->sum('nominal');
+
+    return response()->json(['ok' => true, 'nominal' => (float) $nominal]);
+}
+
+public function customers()
+{
+    $rows = \DB::table('dat_piutang as dp')
+        ->leftJoin('dat_pelanggan as p', 'p.id_pelanggan', '=', 'dp.id_pelanggan')
+        ->where('dp.status', 0) // hanya yang belum lunas
+        ->select(
+            'dp.id_pelanggan',
+            \DB::raw('COALESCE(p.nama_pelanggan,"") as nama_pelanggan'),
+            \DB::raw('SUM(dp.nominal) as total'),
+            \DB::raw('MIN(dp.tanggal) as terakhir')
+        )
+        ->groupBy('dp.id_pelanggan', 'p.nama_pelanggan')
+        ->orderBy('p.nama_pelanggan')
+        ->get();
+
+    return response()->json(['ok' => true, 'data' => $rows]);
+}
+
+public function byCustomer(Request $r)
+{
+    $r->validate(['id_pelanggan' => 'required|integer']);
+
+    $rows = \DB::table('dat_piutang')
+        ->where('id_pelanggan', $r->id_pelanggan)
+        ->where('status', 0)
+        ->select(
+            'no_transaksi',
+            \DB::raw('SUM(nominal) as nominal'),
+            \DB::raw('MIN(tanggal) as tanggal')
+        )
+        ->groupBy('no_transaksi')
+        ->orderByDesc(\DB::raw('MIN(tanggal)'))
+        ->limit(50)
+        ->get();
+
+    return response()->json(['ok' => true, 'data' => $rows]);
+}
+
+public function nominalpiutang(Request $r)
+{
+    $r->validate([
+        'id_pelanggan' => 'required|integer',
+        'no_transaksi' => 'required|string|max:50',
+    ]);
+
+    $nominal = \DB::table('dat_piutang')
+        ->where('id_pelanggan', $r->id_pelanggan)
+        ->where('no_transaksi', $r->no_transaksi)
+        ->where('status', 0)
+        ->sum('nominal');
+
+    return response()->json(['ok' => true, 'nominal' => (float)$nominal]);
+}
 
 }

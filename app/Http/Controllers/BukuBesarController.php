@@ -404,6 +404,65 @@ public function storetransaksi(Request $request)
         }
         $noTransaksi = $prefix . str_pad($seq + 1, 7, '0', STR_PAD_LEFT);
 
+
+        $toMoney = static function($v){
+            $s = preg_replace('/[^\d\-]/', '', (string)$v);
+            return (int)($s === '' ? 0 : $s);
+        };
+        $nominal = $toMoney($request->nominal); 
+
+        $kp = null; $noUtang = null;
+        if ($tipe === 'Bayar Utang Usaha') {
+            $request->validate([
+                'kode_pemasok' => ['required','string','max:50'],
+                'no_transaksi' => ['required','string','max:50'],
+            ]);
+            $kp     = (string)$request->kode_pemasok;
+            $noUtang= (string)$request->no_transaksi;
+
+            $totalOutstanding = (int) DB::table('dat_utang')
+                ->where('kode_pemasok', $kp)
+                ->where('no_transaksi', $noUtang)
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->sum('nominal');
+
+            if ($totalOutstanding <= 0) {
+                throw new \RuntimeException('Utang sudah lunas / tidak ditemukan.');
+            }
+
+            if ($nominal !== $totalOutstanding) {
+                throw new \RuntimeException('Nominal bayar harus sama dengan total utang: ' . number_format($totalOutstanding,0,',','.'));
+            }
+        }
+
+        $toMoney = static function($v){ $s=preg_replace('/[^\d\-]/','',(string)$v); return (int)($s===''?0:$s); };
+        $nominal = $toMoney($request->nominal);
+
+        // CHANGES: Piutang
+        $idPelanggan = null; $noPiutang = null;
+        if ($tipe === 'Bayar Piutang Usaha') {
+            $request->validate([
+                'id_pelanggan' => ['required','integer'],
+                'no_transaksi' => ['required','string','max:50'],
+            ]);
+            $idPelanggan = (int)$request->id_pelanggan;
+            $noPiutang   = (string)$request->no_transaksi;
+
+            $totalOutstandingPiutang = (int)\DB::table('dat_piutang')
+                ->where('id_pelanggan', $idPelanggan)
+                ->where('no_transaksi', $noPiutang)
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->sum('nominal');
+
+            if ($totalOutstandingPiutang <= 0) {
+                throw new \RuntimeException('Piutang sudah lunas / tidak ditemukan.');
+            }
+            if ($nominal !== $totalOutstandingPiutang) {
+                throw new \RuntimeException('Nominal bayar harus sama dengan total piutang: ' . number_format($totalOutstandingPiutang,0,',','.'));
+            }
+        }
         // =========================
         // Transaksi Manual
         // =========================
@@ -495,6 +554,7 @@ public function storetransaksi(Request $request)
             'Bayar Listrik/Telepon/Internet/Air',
             'Bayar Utang Bank',
             'Bayar Utang Usaha',
+            'Bayar Piutang Usaha',
             'Bayar Utang Lainnya',
             'Bayar Bunga Bank',
             'Bayar Pajak',
@@ -524,7 +584,8 @@ public function storetransaksi(Request $request)
                 'Bayar Gaji'                          => [7,  1, 1, 2],
                 'Bayar Listrik'                       => [8,  1, 1, 2],
                 'Bayar Utang Bank'                    => [14, 1, 2, 2],
-                'Bayar Utang Usaha'                   => [9,  1, 2, 2],
+                'Bayar Utang Usaha'                   => [5,  1, 2, 2],
+                'Bayar Piutang Usaha'                   => [20,  1, 2, 2],
                 'Beli Peralatan Tunai'                => [10, 1, 2, 2],
                 'Beli ATK Tunai'                      => [11, 1, 2, 2],
                 'Pengambilan Pribadi'                 => [12, 1, 2, 2],
@@ -569,30 +630,46 @@ public function storetransaksi(Request $request)
                 }
               
             }
+            if ($tipe === 'Bayar Utang Usaha') {
+                DB::table('dat_utang')
+                    ->where('kode_pemasok', $kp)
+                    ->where('no_transaksi', $noUtang)
+                    ->where('status', 0)
+                    ->update([
+                        'status'     => 1,
+                       
+                    ]);
+            }
+            if ($tipe === 'Bayar Piutang Usaha') {
+                DB::table('dat_piutang')
+                ->where('id_pelanggan', $idPelanggan)
+                ->where('no_transaksi', $noPiutang)
+                ->where('status', 0)
+                ->update(['status' => 1]);
+            }
+
              if ($tipe === 'Bayar Utang Lainnya') {                         
                 $saldoUtangLain = (float) DB::table('mst_akun')->where('id', 59)->lockForUpdate()->value('saldo_berjalan');
                 if ($saldoUtangLain <= 0) {
                     throw new \RuntimeException('Anda tidak memiliki utang lainnya.');
                 }
             }
-            if ($akunK == 1) {
-                $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
-                if ($saldoKas < $nominal) {
-                    throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
-                }
-            }
+           
             $tipeKreditNaik = [                       
                 'Setoran Pemilik',
                 'Pinjam Uang di Bank',
                 'Pinjam Uang Lainnya',
                 'Pendapatan Bunga',
                 'Pendapatan Lain-lain (Komisi/Hadiah)',
-                'Pinjang Uang Lainnya',                       
+                'Pinjang Uang Lainnya',  
+                'Bayar Piutang Usaha',                     
             ];
             $kreditMenambahSaldo = in_array($tipe, $tipeKreditNaik, true); 
 
             $tipeDebetBerkurang = [
                 'Bayar Utang Bank',
+                'Bayar Utang Usaha',
+                'Bayar Piutang Usaha',
                 'Bayar Utang Lainnya',
             ];
             $debetMengurangiSaldo = in_array($tipe, $tipeDebetBerkurang, true);
@@ -621,7 +698,12 @@ public function storetransaksi(Request $request)
                 'created_at'       => now(),
                 'updated_at'       => now(),
             ]);
-
+            if ($akunK == 1) {
+                $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
+                if ($saldoKas < $nominal) {
+                    throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
+                }
+            }
             // === DETAIL TRANSAKSI ===
             DB::table('dat_detail_transaksi')->insert([
                 [
@@ -652,12 +734,7 @@ public function storetransaksi(Request $request)
             //         ->lockForUpdate()
             //         ->decrement('saldo_berjalan', $nominal);
             // }
-             if (in_array($tipe, ['Bayar Utang Usaha'], true)) {
-                DB::table('mst_akun')
-                    ->where('id', 5)
-                    ->lockForUpdate()
-                    ->decrement('saldo_berjalan', $nominal);
-            }
+           
             if (in_array($tipe, ['Bayar Gaji', 'Bayar Listrik'], true)) {
                 DB::table('mst_akun')
                     ->where('id', 17)
