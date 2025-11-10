@@ -280,7 +280,8 @@
                                         <option>Choose</option>
                                     </select>
                                 </td>
-                                <td><input type="number" min="0" value="0" class="form-control item-qty"></td>
+                                <td><input type="text" min="0" value="0"
+                                        class="form-control item-qty num-only"></td>
                                 <td><input type="text" class="form-control item-satuan" readonly placeholder="-"></td>
                                 <td class="text-right">
                                     <input type="text" class="form-control item-harga" readonly value="0">
@@ -308,23 +309,26 @@
                 <div class="row mt-4">
                     <div class="col-md-6 offset-md-6">
                         <div class="form-group row">
-                            <label class="col-sm-4 col-form-label">Biaya lainya</label>
+                            <label class="col-sm-4 col-form-label">Biaya Ongkir</label>
                             <div class="col-sm-8">
                                 <input type="text" id="biaya_lain" class="form-control text-right rupiah"
                                     value="0">
                             </div>
                         </div>
 
-                        {{-- Diskon % -> otomatis sembunyi saat Inventaris --}}
+                        {{-- Diskon (Nominal) -> otomatis sembunyi saat Inventaris --}}
                         <div class="form-group row" id="group_diskon">
-                            <label class="col-sm-4 col-form-label">Diskon %</label>
+                            <label class="col-sm-4 col-form-label">Diskon</label>
                             <div class="col-sm-8">
-                                <input type="number" id="diskon_persen" class="form-control text-right" value="0">
+                                <input type="text" id="diskon_nominal" class="form-control text-right rupiah"
+                                    value="0">
+                                <small class="text-muted">Masukkan nominal rupiah (contoh: 10000 atau Rp. 10.000)</small>
                             </div>
                         </div>
 
+
                         <div class="form-group row">
-                            <label class="col-sm-4 col-form-label">Pajak</label>
+                            <label class="col-sm-4 col-form-label">PPN</label>
                             <div class="col-sm-8">
                                 <div class="input-group">
                                     <div class="input-group-prepend">
@@ -506,6 +510,31 @@
 @push('scripts')
     <script src="https://cdn.datatables.net/v/bs4/dt-2.1.8/datatables.min.js"></script>
     <script>
+        // kalau belum ada, siapkan parser rupiah yang pakai toNumber()
+        if (typeof window.parseRupiahbiayalain !== 'function') {
+            window.parseRupiahbiayalain = (s) => (typeof toNumber === 'function' ? toNumber(s) : 0);
+        }
+        // formatter rupiah untuk input class .rupiah saat blur
+        $(document).on('blur', '.rupiah', function() {
+            const v = (typeof toNumber === 'function') ? toNumber($(this).val()) : 0;
+            $(this).val('Rp. ' + (Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')));
+        });
+    </script>
+    <script>
+        // Hanya izinkan karakter numeric umum saat mengetik
+        $(document).on('input', '.num-only', function() {
+            this.value = this.value.replace(/[^\d.,-]/g, '');
+        });
+
+        // Saat blur, normalisasi ke angka “bersih” agar tidak kosong/invalid
+        $(document).on('blur', '.item-qty', function() {
+            const n = (typeof toNumber === 'function') ? toNumber(this.value) : 0;
+            this.value = Number.isFinite(n) ? n : 0;
+            $(this).trigger('input'); // supaya subtotal & total ter-update
+        });
+    </script>
+
+    <script>
         $(function() {
             $.ajaxSetup({
                 headers: {
@@ -519,16 +548,37 @@
         window.toNumber = function(v) {
             let s = String(v ?? '').trim();
             if (!s) return 0;
-            s = s.replace(/\s/g, '');
-            if (s.includes('.') && s.includes(',')) {
-                s = s.replace(/\./g, '').replace(',', '.');
-            } else if (s.includes(',')) {
-                s = s.replace(',', '.');
-            }
-            s = s.replace(/[^\d.-]/g, '');
-            return parseFloat(s) || 0;
-        };
 
+            // buang spasi + simbol currency/huruf
+            s = s.replace(/\s/g, '');
+            s = s.replace(/[^\d.,-]/g, ''); // sisakan digit, titik, koma, minus
+
+            const lastDot = s.lastIndexOf('.');
+            const lastComma = s.lastIndexOf(',');
+            const hasDot = lastDot !== -1;
+            const hasComma = lastComma !== -1;
+
+            if (hasDot && hasComma) {
+                // Pakai pemisah desimal yg paling kanan
+                if (lastDot > lastComma) {
+                    // titik = desimal → koma = ribuan
+                    s = s.replace(/,/g, '');
+                } else {
+                    // koma = desimal → titik = ribuan
+                    s = s.replace(/\./g, '');
+                    s = s.replace(/,/g, '.');
+                }
+            } else if (hasComma && !hasDot) {
+                // koma = desimal
+                s = s.replace(/,/g, '.');
+            } else if (hasDot && !hasComma) {
+                // Ambigu: kalau bukan pola desimal 1-2 digit, anggap titik = ribuan
+                if (!/^\d+\.\d{1,2}$/.test(s)) s = s.replace(/\./g, '');
+            }
+
+            const n = parseFloat(s);
+            return Number.isFinite(n) ? n : 0;
+        };
         (function() {
             const $body = $('#inv-rows');
             const toNumber = window.toNumber; // alias lokal
@@ -546,17 +596,22 @@
                     sub += toNumber($(this).val());
                 });
 
+                // biaya lain (rupiah nominal)
                 let biaya = parseRupiahbiayalain($('#biaya_lain').val());
-                console.log('Biaya lain (raw):', $('#biaya_lain').val(), ' -> parsed:', biaya);
-                const discP = toNumber($('#diskon_persen').val());
-                const afterDisc = sub - (sub * (discP / 100));
 
+                // DISKON: sekarang NOMINAL
+                const discN = (typeof toNumber === 'function') ? toNumber($('#diskon_nominal').val()) : 0;
+
+                // pastikan tidak minus
+                const afterDisc = Math.max(0, sub - Math.max(0, discN));
+
+                // pajak 11% jika dicentang
                 let pajak = 0;
                 if ($('#apply_pajak').is(':checked')) {
                     pajak = afterDisc * 0.11;
                 }
 
-                const grand = afterDisc + pajak + biaya;
+                const grand = afterDisc + pajak + Math.max(0, biaya);
 
                 // output diformat
                 $('#pajak_nominal').val(fmt(pajak));
@@ -566,7 +621,7 @@
             window.recompute = recompute;
 
 
-            $('#biaya_lain,#diskon_persen,#apply_pajak').on('input change', recompute);
+            $('#biaya_lain,#diskon_nominal,#apply_pajak').on('input change', recompute);
 
 
             function hitungSubtotal($tr) {
@@ -616,7 +671,7 @@
             });
 
             // recompute on extra fields
-            $('#biaya_lain,#diskon_persen').on('input', recompute);
+            $('#biaya_lain,#diskon_nominal').on('input', recompute);
         })();
 
         function hydrateBarangSelects() {
@@ -855,7 +910,8 @@
                 party_id: $('#party_id').val() || null,
                 tipe_pembayaran: Number($('#tipe_pembayaran').val()),
                 biaya_lain: parseRupiahbiayalain($('#biaya_lain').val()),
-                diskon_persen: _num($('#diskon_persen').val()),
+                diskon_persen: null, // biar backend lama yang "nullable" tetap lolos validasi
+                diskon_nominal: (typeof toNumber === 'function') ? toNumber($('#diskon_nominal').val()) : 0,
                 pajak_persen: 11,
                 no_transaksi: $.trim($('#no_transaksi').val()),
                 apply_pajak: $('#apply_pajak').is(':checked') ? 1 : 0,
@@ -885,7 +941,7 @@
                             $(this).find('.item-subtotal').val('0');
                         });
                         $('#biaya_lain').val('Rp. 0');
-                        $('#diskon_persen').val('0');
+                        $('#diskon_nominal').val('0');
                         $('#pajak_nominal').val('Rp. 0');
                         $('#grand_total').val('Rp. 0');
                         recompute();

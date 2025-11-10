@@ -843,7 +843,72 @@
             });
         })();
     </script>
+    <script>
+        (function() {
+            const rp = n => {
+                n = Number(n || 0);
+                return 'Rp. ' + n.toLocaleString('id-ID');
+            };
 
+            // ====== JURNAL UMUM ======
+            function loadJurnal(page = 1) {
+                const q = $('#searchJurnal').val() || '';
+                $.getJSON('/buku_besar/get_jurnal', {
+                    search: q,
+                    page,
+                    per_page: 20
+                }, function(res) {
+                    const $tb = $('#tblJurnal tbody');
+                    if ($tb.length === 0) $('#tblJurnal').append('<tbody></tbody>');
+                    const $body = $('#tblJurnal tbody').empty();
+
+                    (res.data || []).forEach(r => {
+                        $body.append(
+                            `<tr>
+            <td>${r.tanggal ?? ''}</td>
+            <td>${r.keterangan ?? ''}</td>
+            <td>${r.nama_akun ?? ''}</td>
+            <td class="text-success">${rp(r.debet)}</td>
+            <td class="text-danger">${rp(r.kredit)}</td>
+          </tr>`
+                        );
+                    });
+                    $('#pgJurnal').text(`Total: ${res.total} | Hal: ${res.page}`);
+                });
+            }
+            $('#searchJurnal').on('input', () => loadJurnal(1));
+            loadJurnal();
+
+            // ====== BUKU BESAR ======
+            function loadBuku(page = 1) {
+                const q = $('#searchBuku').val() || '';
+                $.getJSON('/buku_besar/get_buku_besar', {
+                    search: q,
+                    page,
+                    per_page: 20
+                }, function(res) {
+                    if ($('#tblBuku tbody').length === 0) $('#tblBuku').append('<tbody></tbody>');
+                    const $body = $('#tblBuku tbody').empty();
+
+                    (res.data || []).forEach(r => {
+                        $body.append(
+                            `<tr>
+            <td>${r.nama_akun ?? ''}</td>
+            <td>${r.tanggal ?? ''}</td>
+            <td class="text-success">${rp(r.debet)}</td>
+            <td class="text-danger">${rp(r.kredit)}</td>
+            <td>${rp(r.saldo)}</td>
+          
+          </tr>`
+                        );
+                    });
+                    $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);
+                });
+            }
+            $('#searchBuku').on('input', () => loadBuku(1));
+            loadBuku();
+        })();
+    </script>
     <script>
         $('#formPemasokBaru').off('submit').on('submit', function(e) {
             e.preventDefault();

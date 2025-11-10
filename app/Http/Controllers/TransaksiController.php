@@ -485,7 +485,7 @@ class TransaksiController extends Controller
         'party_id'          => ['nullable','integer'],
         'no_transaksi'      => ['required_if:tipe,Inventaris','nullable','string','max:50'],
         'biaya_lain'        => ['nullable','numeric'],
-        'diskon_persen'     => ['nullable','numeric','min:0','max:100'],
+        'diskon_nominal'     => ['nullable','numeric','min:0'],
         'pajak_persen'      => ['nullable','numeric','min:0','max:100'],
         'apply_pajak'       => ['required','boolean'],
         'items'             => ['required','array','min:1'],
@@ -515,7 +515,7 @@ class TransaksiController extends Controller
     $items = collect($request->items)->map(function($it) use ($request) {
         $qty = (float) $it['qty'];
         $harga = ($request->tipe === 'Penjualan')
-            ? (float) $it['hargajual']
+            ? (float) ($it['hargajual'] ?? $it['harga']) 
             : (float) $it['harga'];
 
               $hargaMentah = isset($it['harga_mentah'])
@@ -542,9 +542,10 @@ class TransaksiController extends Controller
     $subtotal      = (float) $items->sum('total');
   
     $biayaLain     = (float) ($request->biaya_lain ?? 0);
-    $diskonPersen  = (float) ($request->diskon_persen ?? 0);
+    $diskonNominal = (float) ($request->diskon_nominal?? 0);
     $pajakPersen   = (float) ($request->pajak_persen ?? 11);
-    $afterDisc     = (float) round($subtotal * (1 - ($diskonPersen / 100)));
+    $afterDisc     = $subtotal - $diskonNominal;
+    // dd($afterDisc);
     $applyPajak    = $request->boolean('apply_pajak');
     $pajakNominal  = $applyPajak ? (float) round($afterDisc * ($pajakPersen / 100)) : 0.0;
     $grandTotal    = max(0, $afterDisc + $pajakNominal + $biayaLain);
@@ -590,7 +591,7 @@ class TransaksiController extends Controller
         $runningPajak = 0;
         $runningBiaya = 0;
         $subtotalSafe = max(1, $subtotal);
-
+        $totalHppMentah = 0.0;
         foreach ($items->values() as $idx => $it) {
             $isLast = ($idx === $items->count() - 1);
             $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])
@@ -601,7 +602,7 @@ class TransaksiController extends Controller
                     throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
                 }
             $base = (float) $it['total'];
-            $afterDiscItem = (float) round($base * (1 - ($diskonPersen / 100)));
+            $afterDiscItem = $base - $diskonNominal;
             $share = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
             $pajakItem = $applyPajak ? (int) round($afterDiscItem * ($pajakPersen / 100)) : 0;
             $biayaItem = (int) round($biayaLain * $share);
@@ -613,6 +614,10 @@ class TransaksiController extends Controller
             }
 
             $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
+           $hargaMentahSrc = $hargaSatuan;
+            $hppRow = (float) round($hargaMentahSrc * (float) $it['qty']);
+            $totalHppMentah += $hppRow;  
+            
 
             $rows[] = [
                 'id_kontak'         => $idKontak,
@@ -624,13 +629,14 @@ class TransaksiController extends Controller
                 'tgl'               => $tglSql,
                 'jml_barang'        => (float) $it['qty'],
                 'metode_pembayaran' => null,
+                'hpp'               => $hppRow,
                 'hpp'               => 0,
                 'harga_mentah'      => (float) $it['harga_mentah'],
                 'pajak'             => $pajakItem,
                 'subtotal'          => (float) $it['subtotal'],
                 'total'             => $totalItem,
                 'biaya_lain'        => (float) $biayaLain,
-                'diskon'             => (float) $diskonPersen,
+                'diskon'             => (float) $diskonNominal,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ];
@@ -670,13 +676,13 @@ class TransaksiController extends Controller
                 $akunDebet  = 1;   // Kas
                 $akunKredit = 15;  // Pendapatan Penjualan
                 $tambahAkun17 = true;
-                $minAkun63 = true;
+                // $minAkun63 = true;
             } else {
                 // Kredit
                 $akunDebet  = 20;   // Piutang Usaha
                 $akunKredit = 15;  // Pendapatan Penjualan
                 $tambahAkun17 = true;
-                $minAkun63 = true;
+                // $minAkun63 = true;
             }
         } else {
             // PEMBELIAN (INVENTARIS)
@@ -685,29 +691,51 @@ class TransaksiController extends Controller
                 $akunDebet  = 6;   // Persediaan / Inventaris
                 $akunKredit = 1;   // Kas
                  $tambahAkun17 = false;
-                 $minAkun63 = false;
+                //  $minAkun63 = false;
             } else {
                 // Kredit
                 $akunDebet  = 6;   // Persediaan / Inventaris
                 $akunKredit = 5;   // Utang Usaha
                  $tambahAkun17 = false;
-                 $minAkun63 = false;
+                //  $minAkun63 = false;
             }
         }
 
         $kreditMenambahSaldo = ($jenisCode === 2 /* Pembelian/Inventaris */ && $tipePembayaran === 2);
         // Panggil helper jurnal
+       $jenisCode = (int) ($request->jenis_code ?? $request->jenisCode ?? 2);
+
+
+        $nominalJurnal = $jenisCode === 1
+            ? (float) ($subtotal ?? 0)      
+            : (float) ($grandTotal ?? 0);
+        // dd($nominalJurnal);
         $this->insertJurnalSimple(
             $tglSql,
-            (float) $grandTotal,
+            $nominalJurnal,
             $keterangan,
             $akunDebet,
             $akunKredit,
-            2, 1,
+            $jenisCode,    
+            1,             
             $noTransaksi,
             $request->tipe,
             $kreditMenambahSaldo
         );
+           if ($jenisCode === 1 && $totalHppMentah > 0) {
+            $this->insertJurnalSimple(
+                $tglSql,
+                (float) $totalHppMentah,
+                'HPP Penjualan ' . $noTransaksi,
+                3,     
+                6,     
+                1,   
+                1,    
+                $noTransaksi,
+                'HPP',
+                false  
+            );
+        }
             if ($tambahAkun17) {
                 $periode = Carbon::parse($tglSql)->format('Y-m');
 
@@ -717,14 +745,21 @@ class TransaksiController extends Controller
                     ->lockForUpdate()
                     ->increment('saldo_berjalan', (float) $grandTotal);
             }
-            if ($minAkun63) {
-                $periode = Carbon::parse($tglSql)->format('Y-m');
+             if ($jenisCode === 1 && $totalHppMentah > 0) {
+            DB::table('mst_akun')
+                ->where('id', 3) // akun HPP
+                ->lockForUpdate()
+                ->decrement('saldo_berjalan', (float) $totalHppMentah);
+        }
 
-                DB::table('mst_akun')
-                    ->whereIn('id', [6, 3])
-                    ->lockForUpdate()
-                    ->decrement('saldo_berjalan', (float) $hargaSatuanTotal);
-            }
+            // if ($minAkun63) {
+            //     $periode = Carbon::parse($tglSql)->format('Y-m');
+
+            //     DB::table('mst_akun')
+            //         ->whereIn('id', [6])
+            //         ->lockForUpdate()
+            //         ->decrement('saldo_berjalan', (float) $hargaSatuanTotal);
+            // }
             
             if ($jenisCode === 2 && $tipePembayaran === 2) {
             $kodePemasok = $request->input('kode_pemasok'); // opsional dari form
@@ -743,6 +778,9 @@ class TransaksiController extends Controller
                 'tanggal'      => $tglSql,
             ]);
         }
+
+     
+
         if ($jenisCode === 1 && $tipePembayaran === 2) { 
             $idPelanggan = (int) ($request->input('pelanggan_id') ?? $idKontak ?? 0);
 
