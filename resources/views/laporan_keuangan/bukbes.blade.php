@@ -229,7 +229,7 @@
                                 <tr>
                                     <th>Tanggal</th>
                                     <th>Keterangan</th>
-
+                                    <th>Nama</th>
                                     <th>Debet</th>
                                     <th>Kredit</th>
                                     <th>Saldo</th>
@@ -248,16 +248,20 @@
         (function() {
             const rp = n => 'Rp. ' + Number(n || 0).toLocaleString('id-ID');
 
-            function loadJurnalDetail(namaAkun) {
-                $('#tblDetailBody').html('<tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>');
-                $.getJSON('/buku_besar/get_jurnal', {
-                    search: namaAkun,
+            function loadJurnalDetail(akunId = null, akunName = '') {
+                $('#tblDetailBody').html(
+                    '<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>');
+                const payload = {
                     per_page: 100
-                }, function(res) {
+                };
+                if (akunId) payload.akun_id = akunId;
+                else if (akunName) payload.akun_name = akunName;
+
+                $.getJSON('/buku_besar/get_jurnal', payload, function(res) {
                     const $body = $('#tblDetailBody').empty();
-                    if (res.data.length === 0) {
+                    if (!res.data || res.data.length === 0) {
                         $body.html(
-                            '<tr><td colspan="5" class="text-center text-muted">Tidak ada data jurnal</td></tr>'
+                            '<tr><td colspan="6" class="text-center text-muted">Tidak ada data jurnal</td></tr>'
                         );
                         return;
                     }
@@ -266,7 +270,7 @@
                     <tr>
                         <td>${r.tanggal ?? ''}</td>
                         <td>${r.keterangan ?? ''}</td>
-                        
+                        <td>${r.nama_akun ?? ''}</td>
                         <td class="text-success">${rp(r.debet)}</td>
                         <td class="text-danger">${rp(r.kredit)}</td>
                         <td>${rp(r.saldo)}</td>
@@ -287,8 +291,11 @@
                     const $body = $('#tblBuku tbody').empty();
 
                     (res.data || []).forEach(r => {
+                        // [changes] simpan id & name ke data-*
                         const row = $(`
-                    <tr class="clickable-row" style="cursor:pointer" data-akun="${r.nama_akun}">
+                    <tr class="clickable-row" style="cursor:pointer"
+                        data-akun-id="${r.id_akun ?? ''}"
+                        data-akun-name="${r.nama_akun ?? ''}">
                         <td>${r.nama_akun ?? ''}</td>
                         <td>${r.tanggal ?? ''}</td>
                         <td class="text-success">${rp(r.debet)}</td>
@@ -299,11 +306,12 @@
                         $body.append(row);
                     });
 
-                    // event klik baris buku besar
+                    // [changes] klik baris: pakai akun_id bila ada, fallback ke nama
                     $('.clickable-row').off('click').on('click', function() {
-                        const akun = $(this).data('akun');
-                        $('#modalDetail .modal-title').text(`Detail - ${akun}`);
-                        loadJurnalDetail(akun);
+                        const akunId = $(this).data('akun-id') || null;
+                        const akunName = $(this).data('akun-name') || '';
+                        $('#modalDetail .modal-title').text(`Detail - ${akunName || 'Akun'}`);
+                        loadJurnalDetail(akunId, akunName);
                         $('#modalDetail').modal('show');
                     });
 

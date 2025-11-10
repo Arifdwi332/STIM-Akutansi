@@ -142,12 +142,12 @@ public function subAkunList(Request $r)
 
     return response()->json(['ok' => true, 'data' => $items]);
 }
- public function storeSaldoAwal(Request $r)
+public function storeSaldoAwal(Request $r)
 {
     $mstId   = $r->input('mst_akun_id');
-    $subIds  = $r->input('sub_akun_id', []);   
-    $nominal = $r->input('nominal', []);      
-    $tanggal  = $r->input('tanggal', []);  
+    $subIds  = $r->input('sub_akun_id', []);    
+    $nominal = $r->input('nominal', []);        
+    $tanggal = $r->input('tanggal', []);        
 
     if (!$mstId) {
         return response()->json(['ok'=>false,'message'=>'Kode akun wajib diisi'], 422);
@@ -157,33 +157,53 @@ public function subAkunList(Request $r)
         $n = (int) preg_replace('/[^\d\-]/', '', (string)$v);
         return max(0, $n);
     };
+    $nominal = array_map($clean, (array)$nominal);
 
-    $nominal = array_map($clean, $nominal);
+    $count = min(count((array)$subIds), count($nominal));
+    if (!is_array($tanggal)) {
+        $tanggal = array_fill(0, $count, (string)$tanggal);
+    } else {
+        $tanggal = array_values($tanggal);
+        if (count($tanggal) < $count) {
+            $last = end($tanggal) ?: now()->toDateString();
+            $tanggal = array_pad($tanggal, $count, $last);
+        }
+    }
 
-    
-    $count = min(count($subIds), count($nominal));
-
-    // hitung total
     $total = 0;
     for ($i=0; $i<$count; $i++) {
-        $total += $nominal[$i];
+        $total += (int)$nominal[$i];
     }
 
     try {
-       DB::transaction(function () use ($mstId, $subIds, $nominal, $tanggal, $count, $total) {
-        
-            
+        DB::transaction(function () use ($mstId, $subIds, $nominal, $tanggal, $count, $total) {
+
             /** @var MstAkunModel $mst */
             $mst = MstAkunModel::lockForUpdate()->findOrFail($mstId);
 
-            $currAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($mst->saldo_awal ?? '0'));
-            $currJalan = (int) preg_replace('/[^\d\-]/', '', (string)($mst->saldo_berjalan ?? '0'));
+            $toInt = static function($v){
+                return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
+            };
 
+            // Tentukan nature akun (debit/kredit)
+            $akunKode = (string) ($mst->kode_akun ?? '');
+            $isDebitNature = in_array($akunKode, ['1101','1103','1104'])
+                ? true
+                : (in_array($akunKode, ['2101','2201']) ? false : in_array(substr($akunKode, 0, 1), ['1','5']));
+
+            // Ambil akun pasangan (Modal 3101) lebih awal
+            /** @var MstAkunModel $modalAcc */
+            $modalAcc = MstAkunModel::where('kode_akun', '3101')->lockForUpdate()->firstOrFail();
+            $modalId  = (int) $modalAcc->id;
+
+            // Update saldo akun induk
+            $currAwal  = $toInt($mst->saldo_awal ?? '0');
+            $currJalan = $toInt($mst->saldo_berjalan ?? '0');
             $mst->saldo_awal      = (string)($currAwal + $total);
             $mst->saldo_berjalan  = (string)($currJalan + $total);
             $mst->save();
 
-            // distribusi ke sub akun (jika ada)
+            // Update saldo sub-akun (jika ada)
             $bySub = [];
             for ($i=0; $i<$count; $i++) {
                 $sid = $subIds[$i] ?? null;
@@ -198,156 +218,182 @@ public function subAkunList(Request $r)
                         ->get();
 
                 foreach ($subs as $sub) {
-                    $currAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($sub->saldo_awal ?? '0'));
-                    $currJalan = (int) preg_replace('/[^\d\-]/', '', (string)($sub->saldo_berjalan ?? '0'));
-                    $add       = $bySub[$sub->id];
-
-                    $sub->saldo_awal     = (string)($currAwal + $add);
-                    $sub->saldo_berjalan = (string)($currJalan + $add);
+                    $sAwal  = $toInt($sub->saldo_awal ?? '0');
+                    $sJalan = $toInt($sub->saldo_berjalan ?? '0');
+                    $add    = $bySub[$sub->id];
+                    $sub->saldo_awal     = (string)($sAwal + $add);
+                    $sub->saldo_berjalan = (string)($sJalan + $add);
                     $sub->save();
                 }
             }
 
-           
-           $akunKode = (string) ($mst->kode_akun ?? '');
-            $isDebitNature = in_array($akunKode, ['1101','1103','1104'])
-                ? true
-                : (in_array($akunKode, ['2101','2201']) ? false : in_array(substr($akunKode, 0, 1), ['1','5']));
+            // Agregasi per-periode untuk akun induk
+            $aggPerPeriode = [];  // ['YYYY-MM' => ['debit'=>x, 'kredit'=>y]]
+            for ($i=0; $i<$count; $i++) {
+                $val = (int)($nominal[$i] ?? 0);
+                if ($val <= 0) continue;
 
-            
-            $agg = [];
-          foreach ($nominal as $i => $val) {
-            if ($val <= 0) continue;
-
-           $periode = Carbon::parse($tanggal)->format('Y-m');
-
-            $tgl = $tanggal[$i] ?? null;
-            if (!empty($tgl)) {
+                $tgl = $tanggal[$i] ?: now()->toDateString();
                 try {
-                   $periode = Carbon::parse($tanggal)->format('Y-m');
+                    $periode = \Carbon\Carbon::parse($tgl)->format('Y-m');
                 } catch (\Throwable $e) {
+                    $periode = now()->format('Y-m');
                 }
+
+                if (!isset($aggPerPeriode[$periode])) $aggPerPeriode[$periode] = ['debit'=>0, 'kredit'=>0];
+                if ($isDebitNature)  $aggPerPeriode[$periode]['debit']  += $val;
+                else                 $aggPerPeriode[$periode]['kredit'] += $val;
             }
 
-            if (!isset($agg[$periode])) $agg[$periode] = ['debit'=>0, 'kredit'=>0];
-            if ($isDebitNature)  $agg[$periode]['debit']  += $val;
-            else                 $agg[$periode]['kredit'] += $val;
-        }
+            // Agregasi per-periode untuk akun pasangan (dibalik)
+            $aggPerPeriodeModal = [];
+            foreach ($aggPerPeriode as $periode => $dk) {
+                $aggPerPeriodeModal[$periode] = [
+                    'debit'  => $dk['kredit'],
+                    'kredit' => $dk['debit'],
+                ];
+            }
 
-
-            $toInt = static function($v){
-                return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
-            };
-
-            $bb = DB::table('dat_buku_besar');
-            foreach ($agg as $periode => $dk) {
-                $row = $bb->lockForUpdate()
-                          ->where('id_akun', $mstId)
-                          ->where('periode', $periode)
-                          ->first();
+            // Helper: update/insert buku besar dengan builder baru setiap call
+            $applyBB = static function (int $akunId, string $periode, int $debit, int $kredit) use ($toInt) {
+                $row = DB::table('dat_buku_besar')
+                    ->lockForUpdate()
+                    ->where('id_akun', $akunId)
+                    ->where('periode', $periode)
+                    ->first();
 
                 if ($row) {
-                    $newDebit  = $toInt($row->ttl_debit)  + $dk['debit'];
-                    $newKredit = $toInt($row->ttl_kredit) + $dk['kredit'];
+                    $newDebit  = $toInt($row->ttl_debit)  + $debit;
+                    $newKredit = $toInt($row->ttl_kredit) + $kredit;
 
-                    $bb->where('id_akun', $mstId)
-                       ->where('periode', $periode)
-                       ->update([
-                           'ttl_debit'   => (string)$newDebit,
-                           'ttl_kredit'  => (string)$newKredit,
-                           'saldo_akhir' => (string)($newDebit - $newKredit),
-                           'updated_at'  => now(),
-                       ]);
+                    DB::table('dat_buku_besar')
+                        ->where('id_akun', $akunId)
+                        ->where('periode', $periode)
+                        ->update([
+                            'ttl_debit'   => (string) $newDebit,
+                            'ttl_kredit'  => (string) $newKredit,
+                            'saldo_akhir' => (string) ($newDebit - $newKredit),
+                            'updated_at'  => now(),
+                        ]);
                 } else {
-                    $bb->insert([
-                        'id_akun'     => $mstId,      
-                        'periode'     => $periode,    
-                        'ttl_debit'   => (string)$dk['debit'],
-                        'ttl_kredit'  => (string)$dk['kredit'],
-                        'saldo_akhir' => (string)($dk['debit'] - $dk['kredit']),
+                    DB::table('dat_buku_besar')->insert([
+                        'id_akun'     => $akunId,
+                        'periode'     => $periode,
+                        'ttl_debit'   => (string) $debit,
+                        'ttl_kredit'  => (string) $kredit,
+                        'saldo_akhir' => (string) ($debit - $kredit),
                         'created_at'  => now(),
                         'updated_at'  => now(),
                     ]);
                 }
+            };
+
+            // Update buku besar: akun induk
+            foreach ($aggPerPeriode as $periode => $dk) {
+                $applyBB((int) $mstId, $periode, (int) $dk['debit'], (int) $dk['kredit']);
             }
-           if ($akunKode === '1101' && $total > 0) {
+            // Update buku besar: akun pasangan (Modal 3101)
+            foreach ($aggPerPeriodeModal as $periode => $dk) {
+                $applyBB((int) $modalId, $periode, (int) $dk['debit'], (int) $dk['kredit']);
+            }
 
-            /** @var MstAkunModel $modal */
-            $modal = MstAkunModel::where('kode_akun', '3101')   
-                        ->lockForUpdate()
-                        ->firstOrFail();
+            // Penyesuaian saldo akun modal (ikut natur)
+            if ($total > 0) {
+                if (in_array($akunKode, ['1101','1103','1104'], true)) {
+                    // akun induk debit-nature => modal "dikredit" (saldo_kredit bertambah -> angka disimpan +total)
+                    $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
+                    $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+                    $modalAcc->saldo_awal     = (string)($mAwal + $total);
+                    $modalAcc->saldo_berjalan = (string)($mJalan + $total);
+                    $modalAcc->save();
+                } elseif (in_array($akunKode, ['2101','2201'], true)) {
+                    // akun induk kredit-nature => modal "didebit" (saldo_kredit berkurang -> angka disimpan -total)
+                    $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
+                    $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+                    $modalAcc->saldo_awal     = (string)($mAwal - $total);
+                    $modalAcc->saldo_berjalan = (string)($mJalan - $total);
+                    $modalAcc->save();
+                }
+            }
 
-            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
-            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
+            // Buat jurnal per-tanggal
+            $aggPerTanggal = [];  // ['YYYY-MM-DD' => total]
+            for ($i=0; $i<$count; $i++) {
+                $val = (int)($nominal[$i] ?? 0);
+                if ($val <= 0) continue;
+                $tgl = $tanggal[$i] ?: now()->toDateString();
+                $aggPerTanggal[$tgl] = ($aggPerTanggal[$tgl] ?? 0) + $val;
+            }
 
-            $modal->saldo_awal     = (string)($modalAwal + $total);
-            $modal->saldo_berjalan = (string)($modalJalan + $total);
-            $modal->save();
-        }
-         if ($akunKode === '2201' && $total > 0) {
+            foreach ($aggPerTanggal as $tgl => $amt) {
+                $noReferensi = 'SA-' . ($mst->kode_akun ?? $mstId) . '-' . \Carbon\Carbon::parse($tgl)->format('Ymd');
+                $ket = 'Saldo Awal ' . ($mst->nama_akun ?? 'Akun');
 
-            /** @var MstAkunModel $modal */
-            $modal = MstAkunModel::where('kode_akun', '3101')   // MODAL
-                        ->lockForUpdate()
-                        ->firstOrFail();
+                $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
+                    'tgl_transaksi' => $tgl,
+                    'no_referensi'  => $noReferensi,
+                    'keterangan'    => $ket,
+                    'modul_sumber'  => 'Saldo Awal',
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ]);
 
-            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
-            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
+                // Ambil saldo berjalan terbaru (setelah penyesuaian di atas)
+                $saldoAkunAfter  = $toInt(DB::table('mst_akun')->lockForUpdate()->where('id', $mstId)->value('saldo_berjalan'));
+                $saldoModalAfter = $toInt(DB::table('mst_akun')->lockForUpdate()->where('id', $modalId)->value('saldo_berjalan'));
 
-            // kurangi modal sebesar total kas yang ditambahkan
-            $modal->saldo_awal     = (string)($modalAwal - $total);
-            $modal->saldo_berjalan = (string)($modalJalan - $total);
-            $modal->save();
-        }
-        if ($akunKode === '1104' && $total > 0) {
-
-            /** @var MstAkunModel $modal */
-            $modal = MstAkunModel::where('kode_akun', '3101')   // MODAL
-                        ->lockForUpdate()
-                        ->firstOrFail();
-
-            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
-            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
-
-            // kurangi modal sebesar total kas yang ditambahkan
-            $modal->saldo_awal     = (string)($modalAwal + $total);
-            $modal->saldo_berjalan = (string)($modalJalan + $total);
-            $modal->save();
-        }
-        if ($akunKode === '1103' && $total > 0) {
-
-            /** @var MstAkunModel $modal */
-            $modal = MstAkunModel::where('kode_akun', '3101') // MODAL
-                        ->lockForUpdate()
-                        ->firstOrFail();
-
-            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
-            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
-
-            $modal->saldo_awal     = (string)($modalAwal + $total);
-            $modal->saldo_berjalan = (string)($modalJalan + $total);
-            $modal->save();
-        }
-        if ($akunKode === '2101' && $total > 0) {
-            /** @var MstAkunModel $modal */
-            $modal = MstAkunModel::where('kode_akun', '3101')
-                        ->lockForUpdate()
-                        ->firstOrFail();
-
-            $modalAwal  = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_awal ?? '0'));
-            $modalJalan = (int) preg_replace('/[^\d\-]/', '', (string)($modal->saldo_berjalan ?? '0'));
-
-            // Modal dikurangi sebesar total saldo akun 2101
-            $modal->saldo_awal     = (string)($modalAwal - $total);
-            $modal->saldo_berjalan = (string)($modalJalan - $total);
-            $modal->save();
-        }
+                if ($isDebitNature) {
+                    // Dr Akun Induk, Cr Modal
+                    DB::table('dat_detail_jurnal')->insert([
+                        [
+                            'id_jurnal'       => $idJurnal,
+                            'id_akun'         => (int)$mstId,
+                            'jml_debit'       => (int)$amt,
+                            'jml_kredit'      => 0,
+                            'saldo_berjalan'  => (string) $saldoAkunAfter,
+                            'created_at'      => now(),
+                            'updated_at'      => now(),
+                        ],
+                        [
+                            'id_jurnal'       => $idJurnal,
+                            'id_akun'         => $modalId,
+                            'jml_debit'       => 0,
+                            'jml_kredit'      => (int)$amt,
+                            'saldo_berjalan'  => (string) $saldoModalAfter,
+                            'created_at'      => now(),
+                            'updated_at'      => now(),
+                        ],
+                    ]);
+                } else {
+                    // Dr Modal, Cr Akun Induk
+                    DB::table('dat_detail_jurnal')->insert([
+                        [
+                            'id_jurnal'       => $idJurnal,
+                            'id_akun'         => $modalId,
+                            'jml_debit'       => (int)$amt,
+                            'jml_kredit'      => 0,
+                            'saldo_berjalan'  => (string) $saldoModalAfter,
+                            'created_at'      => now(),
+                            'updated_at'      => now(),
+                        ],
+                        [
+                            'id_jurnal'       => $idJurnal,
+                            'id_akun'         => (int)$mstId,
+                            'jml_debit'       => 0,
+                            'jml_kredit'      => (int)$amt,
+                            'saldo_berjalan'  => (string) $saldoAkunAfter,
+                            'created_at'      => now(),
+                            'updated_at'      => now(),
+                        ],
+                    ]);
+                }
+            }
         });
 
         return response()->json([
-            'ok'     => true,
-            'message'=> 'Saldo awal berhasil disimpan',
-            'total'  => $total,
+            'ok'      => true,
+            'message' => 'Saldo awal & jurnal berhasil disimpan',
+            'total'   => $total,
         ]);
 
     } catch (\Throwable $e) {
@@ -358,6 +404,9 @@ public function subAkunList(Request $r)
         ], 500);
     }
 }
+
+
+
 
         
 public function storetransaksi(Request $request)
@@ -900,63 +949,69 @@ public function storetransaksi(Request $request)
             throw new \RuntimeException("Akun kredit (ID {$akunKredit}) tidak ditemukan di mst_akun.");
         }
     }
-      public function getJurnal(Request $request)
-    {
-        $search   = trim($request->get('search', ''));
-        $dateFrom = $request->get('date_from'); // 'YYYY-MM-DD'
-        $dateTo   = $request->get('date_to');   // 'YYYY-MM-DD'
-        $page     = max(1, (int) $request->get('page', 1));
-        $perPage  = max(1, min(100, (int) $request->get('per_page', 20)));
+ public function getJurnal(Request $request)
+{
+    $search    = trim((string) $request->get('search', '')); // filter bebas (opsional)
+    $akunId    = $request->get('akun_id');                   // [changes] prioritas filter by id_akun
+    $akunName  = trim((string) $request->get('akun_name', '')); // [changes] fallback exact name
+    $dateFrom  = $request->get('date_from'); // 'YYYY-MM-DD'
+    $dateTo    = $request->get('date_to');   // 'YYYY-MM-DD'
+    $page      = max(1, (int) $request->get('page', 1));
+    $perPage   = max(1, min(100, (int) $request->get('per_page', 20)));
 
-        $q = DB::table('dat_detail_jurnal as d')
+    $q = DB::table('dat_detail_jurnal as d')
         ->join('dat_header_jurnal as h', 'h.id_jurnal', '=', 'd.id_jurnal')
         ->join('mst_akun as a', 'a.id', '=', 'd.id_akun')
         ->select([
-                'h.tgl_transaksi as tanggal',
-                'h.keterangan',
-                'a.nama_akun',
-                'd.jml_debit as debet',
-                'd.jml_kredit as kredit',
-                DB::raw("COALESCE(h.modul_sumber, 'Manual') as tipe"),
-                 'a.saldo_berjalan as saldo',
-            ]);
-
-        if ($search !== '') {
-            $q->where(function($w) use ($search) {
-                $w->where('h.keterangan', 'like', "%{$search}%")
-                  ->orWhere('a.nama_akun', 'like', "%{$search}%")
-                  ->orWhere('a.kode_akun', 'like', "%{$search}%");
-            });
-        }
-
-        if ($dateFrom) {
-            $q->whereDate('h.tgl_transaksi', '>=', $dateFrom);
-        }
-        if ($dateTo) {
-            $q->whereDate('h.tgl_transaksi', '<=', $dateTo);
-        }
-
-        $total = (clone $q)->count();
-        $rows  = $q->orderBy('h.tgl_transaksi', 'desc')
-                   ->offset(($page-1)*$perPage)
-                   ->limit($perPage)
-                   ->get()
-                   ->map(function($r){
-                        // pastikan numeric
-                        $r->debet  = (float) $r->debet;
-                        $r->kredit = (float) $r->kredit;
-                        $r->saldo  = (float) $r->saldo;
-                        return $r;
-                   });
-
-        return response()->json([
-            'ok'        => true,
-            'data'      => $rows,
-            'page'      => $page,
-            'per_page'  => $perPage,
-            'total'     => $total,
+            'h.tgl_transaksi as tanggal',
+            'h.keterangan',
+            'a.nama_akun',
+            'd.jml_debit as debet',
+            'd.jml_kredit as kredit',
+            DB::raw("COALESCE(h.modul_sumber, 'Manual') as tipe"),
+            'd.saldo_berjalan as saldo',
         ]);
+
+    // [changes] filter AKUN spesifik (prioritas id, fallback exact name)
+    if (!empty($akunId)) {
+        $q->where('d.id_akun', (int) $akunId);
+    } elseif ($akunName !== '') {
+        $q->where('a.nama_akun', '=', $akunName);
     }
+
+    // [changes] 'search' hanya untuk filter bebas tambahan (tidak menentukan akun)
+    if ($search !== '') {
+        $q->where(function($w) use ($search) {
+            $w->where('h.keterangan', 'like', "%{$search}%")
+              ->orWhere('a.kode_akun', 'like', "%{$search}%");
+        });
+    }
+
+    if ($dateFrom) $q->whereDate('h.tgl_transaksi', '>=', $dateFrom);
+    if ($dateTo)   $q->whereDate('h.tgl_transaksi', '<=', $dateTo);
+
+    $total = (clone $q)->count();
+
+    $rows = $q->orderBy('h.tgl_transaksi', 'desc')
+        ->offset(($page - 1) * $perPage)
+        ->limit($perPage)
+        ->get()
+        ->map(function($r){
+            $r->debet  = (float) $r->debet;
+            $r->kredit = (float) $r->kredit;
+            $r->saldo  = (float) $r->saldo;
+            return $r;
+        });
+
+    return response()->json([
+        'ok'       => true,
+        'data'     => $rows,
+        'page'     => $page,
+        'per_page' => $perPage,
+        'total'    => $total,
+    ]);
+}
+
 
     
     public function getBukuBesar(Request $request)
