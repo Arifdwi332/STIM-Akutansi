@@ -19,13 +19,13 @@ class LaporanKeuanganController extends Controller
     {
         return view('laporan_keuangan.jurnal');
     }
-   public function getLabaRugi(Request $request)
+ public function getLabaRugi(Request $request)
 {
     $q       = trim($request->input('search', ''));
     $page    = max(1, (int) $request->input('page', 1));
     $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
 
-    // Ambil data dari transaksi
+    // ===== Ambil data dari transaksi
     $trxRows = DB::table('dat_detail_transaksi as ddt')
         ->leftJoin('mst_akun as a1', 'a1.kode_akun', '=', 'ddt.kode_akun')
         ->where('ddt.jenis_laporan', 1)
@@ -42,12 +42,14 @@ class LaporanKeuanganController extends Controller
             $like = '%'.$q.'%';
             $w->where(function($x) use ($like) {
                 $x->where('a1.nama_akun', 'like', $like)
-                  ->orWhere('ddt.kode_akun', 'like', $like);
+                  ->orWhere('ddt.kode_akun', 'like', $like)
+                  // [changes] juga boleh cari lewat a1.kode_akun
+                  ->orWhere('a1.kode_akun', 'like', $like);
             });
         })
         ->get();
 
-    // Ambil data dari jurnal
+    // ===== Ambil data dari jurnal
     $jurRows = DB::table('dat_detail_jurnal as ddj')
         ->leftJoin('mst_akun as a2', 'a2.id', '=', 'ddj.id_akun')
         ->where('ddj.jenis_laporan', 1)
@@ -63,51 +65,54 @@ class LaporanKeuanganController extends Controller
         ->when($q !== '', function($w) use ($q) {
             $like = '%'.$q.'%';
             $w->where(function($x) use ($like) {
-                $x->where('a2.nama_akun', 'like', $like);
+                $x->where('a2.nama_akun', 'like', $like)
+                  // [changes] support cari kode akun juga
+                  ->orWhere('a2.kode_akun', 'like', $like);
             });
         })
         ->get();
 
-    // Gabungkan data transaksi dan jurnal
-    $all = $trxRows->concat($jurRows)
-        ->map(function ($r) {
-            $r->debet  = (float) $r->debet;
-            $r->kredit = (float) $r->kredit;
-            return $r;
-        });
+    // ===== Gabungkan & casting angka
+    $all = $trxRows->concat($jurRows)->map(function ($r) {
+        $r->debet  = (float) $r->debet;
+        $r->kredit = (float) $r->kredit;
+        return $r;
+    });
 
-    // 🔹 Akumulasi khusus untuk kode_akun = 6101
-    $akun6101 = $all->where('kode_akun', '6101');
-    $sum6101 = null;
-    if ($akun6101->isNotEmpty()) {
-        $first = $akun6101->first();
-        $sum6101 = (object)[
+    // ===== [changes] Akumulasi per KODE_AKUN (nama akun muncul sekali)
+    $grouped = $all->groupBy('kode_akun')->map(function ($rows, $kode) {
+        $first = $rows->first();
+        return (object)[
             'id_row'        => null,
             'sumber'        => 'akumulasi',
-            'nama_akun'     => $first->nama_akun, // pakai nama asli akun
+            'nama_akun'     => $first->nama_akun ?: (string)$kode,
             'kategori_akun' => $first->kategori_akun,
-            'kode_akun'     => '6101',
-            'debet'         => $akun6101->sum('debet'),
-            'kredit'        => $akun6101->sum('kredit'),
+            'kode_akun'     => (string)$kode,
+            'debet'         => $rows->sum('debet'),
+            'kredit'        => $rows->sum('kredit'),
         ];
+    })->values();
+
+    // ===== [changes] (opsional) filter lagi setelah akumulasi biar konsisten
+    if ($q !== '') {
+        $grouped = $grouped->filter(function($r) use ($q) {
+            return mb_stripos((string)$r->nama_akun, $q) !== false
+                || mb_stripos((string)$r->kode_akun, $q) !== false;
+        })->values();
     }
 
-    // 🔹 Gabungkan ulang data selain kode_akun 6101 + hasil akumulasinya
-    $all = $all
-        ->reject(fn($r) => $r->kode_akun === '6101')
-        ->when($sum6101, fn($col) => $col->push($sum6101))
-        ->sortBy([
-            ['kategori_akun', fn($v) => $v !== 'Pendapatan'],
-            ['nama_akun', 'asc']
-        ])
-        ->values();
+    // ===== [changes] Urutkan: Pendapatan dulu, lalu nama akun
+    $grouped = $grouped->sortBy([
+        fn($r) => $r->kategori_akun !== 'Pendapatan',
+        'nama_akun'
+    ])->values();
 
-    // Pagination
-    $total  = $all->count();
+    // ===== Pagination
+    $total  = $grouped->count();
     $offset = ($page - 1) * $perPage;
-    $rows   = $all->slice($offset, $perPage)->values();
+    $rows   = $grouped->slice($offset, $perPage)->values();
 
-    // Response JSON
+    // ===== Response
     return response()->json([
         'ok'    => true,
         'data'  => $rows,
@@ -115,6 +120,7 @@ class LaporanKeuanganController extends Controller
         'page'  => $page,
     ]);
 }
+
 
 
 

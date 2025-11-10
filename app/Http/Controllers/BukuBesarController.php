@@ -1058,6 +1058,7 @@ public function storetransaksi(Request $request)
             $q = DB::table('dat_buku_besar as b')
             ->join('mst_akun as a', 'a.id', '=', 'b.id_akun')
             ->select([
+                'a.kode_akun', 
                 'a.nama_akun',
                 'b.periode as tanggal', 
                 'b.ttl_debit as debet',
@@ -1079,26 +1080,26 @@ public function storetransaksi(Request $request)
         }
 
         $total = (clone $q)->count();
-        $rows  = $q->orderBy('b.periode', 'desc')
-                   ->orderBy('a.kode_akun')
-                   ->offset(($page-1)*$perPage)
-                   ->limit($perPage)
-                   ->get()
-                   ->map(function($r){
-                        $r->debet  = (float) $r->debet;
-                        $r->kredit = (float) $r->kredit;
-                        $r->saldo  = (float) $r->saldo;
-                        return $r;
-                   });
+        $rows = $q->orderBy('a.kode_akun', 'asc')   // ← urutkan berdasarkan kode akun ASC
+              ->orderBy('b.periode', 'desc')    // opsional: dalam tiap akun, periode terbaru dulu
+              ->offset(($page - 1) * $perPage)
+              ->limit($perPage)
+              ->get()
+              ->map(function($r){
+                  $r->debet  = (float) $r->debet;
+                  $r->kredit = (float) $r->kredit;
+                  $r->saldo  = (float) $r->saldo;
+                  return $r;
+              });
 
-        return response()->json([
-            'ok'        => true,
-            'data'      => $rows,
-            'page'      => $page,
-            'per_page'  => $perPage,
-            'total'     => $total,
-        ]);
-    }
+    return response()->json([
+        'ok'        => true,
+        'data'      => $rows,
+        'page'      => $page,
+        'per_page'  => $perPage,
+        'total'     => $total,
+    ]);
+}
       public function listPemasok()
     {
         $tp = (new PemasokModel)->getTable();     

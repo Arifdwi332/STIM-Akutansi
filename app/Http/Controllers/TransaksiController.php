@@ -811,6 +811,7 @@ private function insertJurnalSimple(
             'updated_at'    => $now,
         ]);
 
+
         DB::table('dat_detail_jurnal')->insert([
             [
                 'id_jurnal'       => $idJurnal,
@@ -819,6 +820,7 @@ private function insertJurnalSimple(
                 'jml_kredit'      => 0,
                 'jenis_laporan'   => $jenisLaporanDebet,
                 'saldo_berjalan'  => $saldoDebetAfter,
+                'tanggal'      => $tanggal,
                 'created_at'      => $now,
                 'updated_at'      => $now,
             ],
@@ -829,6 +831,7 @@ private function insertJurnalSimple(
                 'jml_kredit'      => $nominal,
                 'jenis_laporan'   => $jenisLaporanKredit,
                 'saldo_berjalan'  => $saldoKreditAfter,
+                'tanggal'      => $tanggal,
                 'created_at'      => $now,
                 'updated_at'      => $now,
             ],
