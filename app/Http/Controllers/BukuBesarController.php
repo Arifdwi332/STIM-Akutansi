@@ -1080,7 +1080,7 @@ public function storetransaksi(Request $request)
 
         $total = (clone $q)->count();
         $rows  = $q->orderBy('b.periode', 'desc')
-                   ->orderBy('a.nama_akun')
+                   ->orderBy('a.kode_akun')
                    ->offset(($page-1)*$perPage)
                    ->limit($perPage)
                    ->get()
