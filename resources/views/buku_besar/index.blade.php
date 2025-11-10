@@ -558,25 +558,27 @@
 
             function buildPair() {
                 return $(`
-                    <div class="form-row align-items-start bb-pair">
-                    <div class="col-md-6 mb-2">
-                        <select class="form-control sub-akun-select" name="sub_akun_id[]">
-                        ${subOptionsHtml}
-                        </select>
+                <div class="form-row align-items-start bb-pair">
+                <div class="col-md-6 mb-2">
+                    <select class="form-control sub-akun-select" name="sub_akun_id[]">
+                    ${subOptionsHtml}
+                    </select>
+                    <input type="date" class="form-control bb-tanggal mt-2" name="tanggal[]">
+                </div>
+                <div class="col-md-6 mb-2">
+                    <div class="input-group">
+                    <input type="text" class="form-control bb-nominal" name="nominal[]" placeholder="Rp">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-danger remove-pair">
+                        <i class="fas fa-trash"></i>
+                        </button>
                     </div>
-                    <div class="col-md-6 mb-2">
-                        <div class="input-group">
-                        <input type="text" class="form-control bb-nominal" name="nominal[]" placeholder="Rp">
-                        <div class="input-group-append">
-                            <button type="button" class="btn btn-danger remove-pair">
-                            <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                        </div>
                     </div>
-                    </div>
-                `);
+                </div>
+                </div>
+            `);
             }
+
 
 
             $btnAdd.on('click', function() {
@@ -698,14 +700,17 @@
                 const payload = {
                     mst_akun_id: $('#kode_akun_id').val(),
                     'sub_akun_id[]': [],
-                    'nominal[]': []
+                    'nominal[]': [],
+                    'tanggal[]': []
                 };
 
                 $('#pair-wrap .bb-pair').each(function() {
                     const sid = $(this).find('.sub-akun-select').val();
                     const val = $(this).find('.bb-nominal').val();
+                    const tgl = $(this).find('.bb-tanggal').val();
                     payload['sub_akun_id[]'].push(sid);
                     payload['nominal[]'].push(val);
+                    payload['tanggal[]'].push(tgl);
                 });
 
                 $.ajax({
@@ -715,6 +720,7 @@
                             mst_akun_id: payload.mst_akun_id,
                             'sub_akun_id': payload['sub_akun_id[]'],
                             'nominal': payload['nominal[]'],
+                            tanggal: payload['tanggal[]'],
                             _token: "{{ csrf_token() }}"
                         },
                         dataType: 'json'

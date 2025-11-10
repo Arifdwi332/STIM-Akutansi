@@ -145,10 +145,10 @@ public function subAkunList(Request $r)
 public function storeSaldoAwal(Request $r)
 {
     $mstId   = $r->input('mst_akun_id');
-    $subIds  = $r->input('sub_akun_id', []);    
-    $nominal = $r->input('nominal', []);        
-    $tanggal = $r->input('tanggal', []);        
-
+    $subIds  = $r->input('sub_akun_id', []);
+    $nominal = $r->input('nominal', []);
+    $tanggal = $r->input('tanggal', []);
+    
     if (!$mstId) {
         return response()->json(['ok'=>false,'message'=>'Kode akun wajib diisi'], 422);
     }
@@ -185,13 +185,13 @@ public function storeSaldoAwal(Request $r)
                 return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
             };
 
-            // Tentukan nature akun (debit/kredit)
+            // Natur akun (debit/kredit)
             $akunKode = (string) ($mst->kode_akun ?? '');
             $isDebitNature = in_array($akunKode, ['1101','1103','1104'])
                 ? true
                 : (in_array($akunKode, ['2101','2201']) ? false : in_array(substr($akunKode, 0, 1), ['1','5']));
 
-            // Ambil akun pasangan (Modal 3101) lebih awal
+            // Akun pasangan: Modal 3101
             /** @var MstAkunModel $modalAcc */
             $modalAcc = MstAkunModel::where('kode_akun', '3101')->lockForUpdate()->firstOrFail();
             $modalId  = (int) $modalAcc->id;
@@ -227,17 +227,22 @@ public function storeSaldoAwal(Request $r)
                 }
             }
 
-            // Agregasi per-periode untuk akun induk
+            // ===== Agregasi per-periode (periode diambil dari TANGGAL REQUEST) =====
             $aggPerPeriode = [];  // ['YYYY-MM' => ['debit'=>x, 'kredit'=>y]]
             for ($i=0; $i<$count; $i++) {
                 $val = (int)($nominal[$i] ?? 0);
                 if ($val <= 0) continue;
 
-                $tgl = $tanggal[$i] ?: now()->toDateString();
+                // ambil raw dari request
+                $tglRaw = (string) ($tanggal[$i] ?? '');
+                // normalisasi ke Y-m-d untuk penyimpanan DATE
                 try {
-                    $periode = \Carbon\Carbon::parse($tgl)->format('Y-m');
+                    $tglStore  = \Carbon\Carbon::parse($tglRaw)->toDateString();
+                    $periode   = \Carbon\Carbon::parse($tglRaw)->format('Y-m');
                 } catch (\Throwable $e) {
-                    $periode = now()->format('Y-m');
+                    // fallback bila parse gagal
+                    $tglStore  = now()->toDateString();
+                    $periode   = now()->format('Y-m');
                 }
 
                 if (!isset($aggPerPeriode[$periode])) $aggPerPeriode[$periode] = ['debit'=>0, 'kredit'=>0];
@@ -245,7 +250,7 @@ public function storeSaldoAwal(Request $r)
                 else                 $aggPerPeriode[$periode]['kredit'] += $val;
             }
 
-            // Agregasi per-periode untuk akun pasangan (dibalik)
+            // Agregasi untuk akun pasangan (dibalik)
             $aggPerPeriodeModal = [];
             foreach ($aggPerPeriode as $periode => $dk) {
                 $aggPerPeriodeModal[$periode] = [
@@ -254,7 +259,7 @@ public function storeSaldoAwal(Request $r)
                 ];
             }
 
-            // Helper: update/insert buku besar dengan builder baru setiap call
+            // Helper akumulasi buku besar (builder baru tiap call)
             $applyBB = static function (int $akunId, string $periode, int $debit, int $kredit) use ($toInt) {
                 $row = DB::table('dat_buku_besar')
                     ->lockForUpdate()
@@ -288,26 +293,23 @@ public function storeSaldoAwal(Request $r)
                 }
             };
 
-            // Update buku besar: akun induk
+            // Update buku besar
             foreach ($aggPerPeriode as $periode => $dk) {
                 $applyBB((int) $mstId, $periode, (int) $dk['debit'], (int) $dk['kredit']);
             }
-            // Update buku besar: akun pasangan (Modal 3101)
             foreach ($aggPerPeriodeModal as $periode => $dk) {
                 $applyBB((int) $modalId, $periode, (int) $dk['debit'], (int) $dk['kredit']);
             }
 
-            // Penyesuaian saldo akun modal (ikut natur)
+            // Penyesuaian saldo akun modal
             if ($total > 0) {
                 if (in_array($akunKode, ['1101','1103','1104'], true)) {
-                    // akun induk debit-nature => modal "dikredit" (saldo_kredit bertambah -> angka disimpan +total)
                     $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
                     $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
                     $modalAcc->saldo_awal     = (string)($mAwal + $total);
                     $modalAcc->saldo_berjalan = (string)($mJalan + $total);
                     $modalAcc->save();
                 } elseif (in_array($akunKode, ['2101','2201'], true)) {
-                    // akun induk kredit-nature => modal "didebit" (saldo_kredit berkurang -> angka disimpan -total)
                     $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
                     $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
                     $modalAcc->saldo_awal     = (string)($mAwal - $total);
@@ -316,21 +318,29 @@ public function storeSaldoAwal(Request $r)
                 }
             }
 
-            // Buat jurnal per-tanggal
-            $aggPerTanggal = [];  // ['YYYY-MM-DD' => total]
+            // ===== Jurnal per TANGGAL REQUEST =====
+            // kunci: tanggal disimpan dari request (dinormalisasi ke Y-m-d)
+            $aggPerTanggal = [];  // ['Y-m-d' => total]
             for ($i=0; $i<$count; $i++) {
                 $val = (int)($nominal[$i] ?? 0);
                 if ($val <= 0) continue;
-                $tgl = $tanggal[$i] ?: now()->toDateString();
-                $aggPerTanggal[$tgl] = ($aggPerTanggal[$tgl] ?? 0) + $val;
+
+                $tglRaw = (string) ($tanggal[$i] ?? '');
+                try {
+                    $tglStore = \Carbon\Carbon::parse($tglRaw)->toDateString(); // simpan sesuai request
+                } catch (\Throwable $e) {
+                    $tglStore = now()->toDateString();
+                }
+
+                $aggPerTanggal[$tglStore] = ($aggPerTanggal[$tglStore] ?? 0) + $val;
             }
 
-            foreach ($aggPerTanggal as $tgl => $amt) {
-                $noReferensi = 'SA-' . ($mst->kode_akun ?? $mstId) . '-' . \Carbon\Carbon::parse($tgl)->format('Ymd');
+            foreach ($aggPerTanggal as $tglStore => $amt) {
+                $noReferensi = 'SA-' . ($mst->kode_akun ?? $mstId) . '-' . \Carbon\Carbon::parse($tglStore)->format('Ymd');
                 $ket = 'Saldo Awal ' . ($mst->nama_akun ?? 'Akun');
 
                 $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
-                    'tgl_transaksi' => $tgl,
+                    'tgl_transaksi' => $tglStore,   // header pakai tanggal request
                     'no_referensi'  => $noReferensi,
                     'keterangan'    => $ket,
                     'modul_sumber'  => 'Saldo Awal',
@@ -338,7 +348,7 @@ public function storeSaldoAwal(Request $r)
                     'updated_at'    => now(),
                 ]);
 
-                // Ambil saldo berjalan terbaru (setelah penyesuaian di atas)
+                // Ambil saldo berjalan terbaru
                 $saldoAkunAfter  = $toInt(DB::table('mst_akun')->lockForUpdate()->where('id', $mstId)->value('saldo_berjalan'));
                 $saldoModalAfter = $toInt(DB::table('mst_akun')->lockForUpdate()->where('id', $modalId)->value('saldo_berjalan'));
 
@@ -351,6 +361,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_debit'       => (int)$amt,
                             'jml_kredit'      => 0,
                             'saldo_berjalan'  => (string) $saldoAkunAfter,
+                            'tanggal'         => $tglStore, // ← dari request (Y-m-d)
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -360,6 +371,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_debit'       => 0,
                             'jml_kredit'      => (int)$amt,
                             'saldo_berjalan'  => (string) $saldoModalAfter,
+                            'tanggal'         => $tglStore, // ← dari request (Y-m-d)
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -373,6 +385,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_debit'       => (int)$amt,
                             'jml_kredit'      => 0,
                             'saldo_berjalan'  => (string) $saldoModalAfter,
+                            'tanggal'         => $tglStore, // ← dari request (Y-m-d)
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -382,6 +395,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_debit'       => 0,
                             'jml_kredit'      => (int)$amt,
                             'saldo_berjalan'  => (string) $saldoAkunAfter,
+                            'tanggal'         => $tglStore, // ← dari request (Y-m-d)
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -404,6 +418,8 @@ public function storeSaldoAwal(Request $r)
         ], 500);
     }
 }
+
+
 
 
 
@@ -992,7 +1008,9 @@ public function storetransaksi(Request $request)
 
     $total = (clone $q)->count();
 
-    $rows = $q->orderBy('h.tgl_transaksi', 'desc')
+    $rows = $q
+   
+    ->orderBy('d.tanggal', 'asc')
         ->offset(($page - 1) * $perPage)
         ->limit($perPage)
         ->get()
