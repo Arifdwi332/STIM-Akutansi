@@ -452,11 +452,9 @@ public function storetransaksi(Request $request)
 
     DB::beginTransaction();
     try {
-        // =========================
-        // Generate Nomor Transaksi
-        // =========================
-        $prefix = 'K'; // K = Kas/Bank
-        $jenisCode = 3; // 3 = transaksi kas/bank
+        
+        $prefix = 'K'; 
+        $jenisCode = 3; 
 
         $lastNo = DB::table('dat_transaksi')
             ->where('no_transaksi', 'like', $prefix . '%')
@@ -858,113 +856,122 @@ public function storetransaksi(Request $request)
 
 
 
-    private function insertJurnalSimple(
-        string $tanggal,
-        float $nominal,
-        ?string $keterangan,
-        int $akunDebet,
-        int $akunKredit,
-        int $jenisLaporanDebet = 1,
-        int $jenisLaporanKredit = 1,
-        string $noReferensi = 'tes',
-        string $modulSumber = 'tes',
-        bool $kreditMenambahSaldo = false,
-        bool $debetMengurangiSaldo = false
-    ): void {
-        // 1) Header jurnal
-        $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
-            'tgl_transaksi' => $tanggal,
-            'no_referensi'  => $noReferensi,
-            'keterangan'    => $keterangan,
-            'modul_sumber'  => $modulSumber,
-            'created_at'    => now(),
-            'updated_at'    => now(),
-        ]);
+  private function insertJurnalSimple(
+    string $tanggal,
+    float $nominal,
+    ?string $keterangan,
+    int $akunDebet,
+    int $akunKredit,
+    int $jenisLaporanDebet = 1,
+    int $jenisLaporanKredit = 1,
+    string $noReferensi = 'tes',
+    string $modulSumber = 'tes',
+    bool $kreditMenambahSaldo = false,
+    bool $debetMengurangiSaldo = false
+): void {
+    // 1) Header jurnal (tetap)
+    $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
+        'tgl_transaksi' => $tanggal,
+        'no_referensi'  => $noReferensi,
+        'keterangan'    => $keterangan,
+        'modul_sumber'  => $modulSumber,
+        'created_at'    => now(),
+        'updated_at'    => now(),
+    ]);
 
-        // 2) Detail jurnal (insert sekaligus 2 baris)
-        DB::table('dat_detail_jurnal')->insert([
-            [
-                'id_jurnal'     => $idJurnal,
-                'id_akun'       => $akunDebet,
-                'jml_debit'     => $nominal,
-                'jml_kredit'    => 0,
-                'id_proyek'     => null,
-                'kode_pajak'    => null,
-                'jenis_laporan' => $jenisLaporanDebet,
-                'created_at'    => now(),
-                'updated_at'    => now(),
-            ],
-            [
-                'id_jurnal'     => $idJurnal,
-                'id_akun'       => $akunKredit,
-                'jml_debit'     => 0,
-                'jml_kredit'    => $nominal,
-                'id_proyek'     => null,
-                'kode_pajak'    => null,
-                'jenis_laporan' => $jenisLaporanKredit,
-                'created_at'    => now(),
-                'updated_at'    => now(),
-            ],
-        ]);
+    // 2) Buku Besar (per-periode) — tetap
+    $periode = Carbon::parse($tanggal)->format('Y-m');
 
-        // 3) Buku Besar (per-periode)
-        $periode = Carbon::parse($tanggal)->format('Y-m');
+    foreach ([
+        $akunDebet  => ['debit' => $nominal, 'kredit' => 0],
+        $akunKredit => ['debit' => 0,        'kredit' => $nominal],
+    ] as $akunId => $val) {
+        $bukbes = DB::table('dat_buku_besar')
+            ->where('id_akun', $akunId)
+            ->where('periode', $periode)
+            ->lockForUpdate()
+            ->first();
 
-        foreach ([
-            $akunDebet  => ['debit' => $nominal, 'kredit' => 0],
-            $akunKredit => ['debit' => 0,        'kredit' => $nominal],
-        ] as $akunId => $val) {
-            $bukbes = DB::table('dat_buku_besar')
-                ->where('id_akun', $akunId)
-                ->where('periode', $periode)
-                ->lockForUpdate()
-                ->first();
-
-            if ($bukbes) {
-                DB::table('dat_buku_besar')
-                    ->where('id_bukbes', $bukbes->id_bukbes)
-                    ->update([
-                        'ttl_debit'   => (float)$bukbes->ttl_debit + (float)$val['debit'],
-                        'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
-                        'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
-                        'updated_at'  => now(),
-                    ]);
-            } else {
-                DB::table('dat_buku_besar')->insert([
-                    'id_akun'     => $akunId,
-                    'periode'     => $periode,
-                    'ttl_debit'   => (float)$val['debit'],
-                    'ttl_kredit'  => (float)$val['kredit'],
-                    'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
-                    'created_at'  => now(),
+        if ($bukbes) {
+            DB::table('dat_buku_besar')
+                ->where('id_bukbes', $bukbes->id_bukbes)
+                ->update([
+                    'ttl_debit'   => (float)$bukbes->ttl_debit + (float)$val['debit'],
+                    'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
+                    'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
                     'updated_at'  => now(),
                 ]);
-            }
+        } else {
+            DB::table('dat_buku_besar')->insert([
+                'id_akun'     => $akunId,
+                'periode'     => $periode,
+                'ttl_debit'   => (float)$val['debit'],
+                'ttl_kredit'  => (float)$val['kredit'],
+                'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]);
         }
+    }
 
-        if ($debetMengurangiSaldo) {                                               // [NEW]
+    $toInt = static function($v){
+        return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
+    };
+
+    if ($debetMengurangiSaldo) {                                              // [changes]
         $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
-                ->decrement('saldo_berjalan', $nominal);
-        } else {
-            $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
-                ->increment('saldo_berjalan', $nominal);
-        }
+            ->decrement('saldo_berjalan', $nominal);
+    } else {
+        $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
+            ->increment('saldo_berjalan', $nominal);
+    }
+    if ($affD === 0) {
+        throw new \RuntimeException("Akun debet (ID {$akunDebet}) tidak ditemukan di mst_akun.");
+    }
+    $saldoDebetAfter = $toInt(DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
+        ->value('saldo_berjalan'));                                           // [changes]
 
-        // $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
-        if ($kreditMenambahSaldo) {
-            $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
-                ->increment('saldo_berjalan', $nominal);
-        } else {
-            $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
-                ->decrement('saldo_berjalan', $nominal);
+    if ($kreditMenambahSaldo) {                                               // [changes]
+        $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+            ->increment('saldo_berjalan', $nominal);
+    } else {
+        $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+            ->decrement('saldo_berjalan', $nominal);
     }
-        if ($affD === 0) {
-            throw new \RuntimeException("Akun debet (ID {$akunDebet}) tidak ditemukan di mst_akun.");
-        }
-        if ($affK === 0) {
-            throw new \RuntimeException("Akun kredit (ID {$akunKredit}) tidak ditemukan di mst_akun.");
-        }
+    if ($affK === 0) {
+        throw new \RuntimeException("Akun kredit (ID {$akunKredit}) tidak ditemukan di mst_akun.");
     }
+    $saldoKreditAfter = $toInt(DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
+        ->value('saldo_berjalan'));                                           // [changes]
+
+    DB::table('dat_detail_jurnal')->insert([
+        [
+            'id_jurnal'       => $idJurnal,
+            'id_akun'         => $akunDebet,
+            'jml_debit'       => $nominal,
+            'jml_kredit'      => 0,
+            'id_proyek'       => null,
+            'kode_pajak'      => null,
+            'jenis_laporan'   => $jenisLaporanDebet,
+            'saldo_berjalan'  => (string) $saldoDebetAfter,                   // [changes]
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ],
+        [
+            'id_jurnal'       => $idJurnal,
+            'id_akun'         => $akunKredit,
+            'jml_debit'       => 0,
+            'jml_kredit'      => $nominal,
+            'id_proyek'       => null,
+            'kode_pajak'      => null,
+            'jenis_laporan'   => $jenisLaporanKredit,
+            'saldo_berjalan'  => (string) $saldoKreditAfter,                  // [changes]
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ],
+    ]);
+}
+
  public function getJurnal(Request $request)
 {
     $search    = trim((string) $request->get('search', '')); // filter bebas (opsional)
