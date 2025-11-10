@@ -550,12 +550,14 @@ public function storetransaksi(Request $request)
             ]);
 
             // === 2) DETAIL JURNAL ===
+           
             DB::table('dat_detail_jurnal')->insert([
                 [
                     'id_jurnal'  => $idJurnal,
                     'id_akun'    => $akunD,
                     'jml_debit'  => $nominal,
                     'jml_kredit' => 0,
+                    'tanggal' => $tanggal,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ],
@@ -564,6 +566,7 @@ public function storetransaksi(Request $request)
                     'id_akun'    => $akunK,
                     'jml_debit'  => 0,
                     'jml_kredit' => $nominal,
+                    'tanggal' => $tanggal,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ],
@@ -590,6 +593,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => $nominal,
                     'jml_kredit'     => 0,
+                    'tanggal' => $tanggal,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -600,6 +604,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => 0,
                     'jml_kredit'     => $nominal,
+                    'tanggal' => $tanggal,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -954,6 +959,7 @@ public function storetransaksi(Request $request)
             'kode_pajak'      => null,
             'jenis_laporan'   => $jenisLaporanDebet,
             'saldo_berjalan'  => (string) $saldoDebetAfter,                   // [changes]
+             'tanggal'    => $tanggal,
             'created_at'      => now(),
             'updated_at'      => now(),
         ],
@@ -966,6 +972,7 @@ public function storetransaksi(Request $request)
             'kode_pajak'      => null,
             'jenis_laporan'   => $jenisLaporanKredit,
             'saldo_berjalan'  => (string) $saldoKreditAfter,                  // [changes]
+             'tanggal'    => $tanggal,
             'created_at'      => now(),
             'updated_at'      => now(),
         ],
@@ -986,7 +993,8 @@ public function storetransaksi(Request $request)
         ->join('dat_header_jurnal as h', 'h.id_jurnal', '=', 'd.id_jurnal')
         ->join('mst_akun as a', 'a.id', '=', 'd.id_akun')
         ->select([
-            'h.tgl_transaksi as tanggal',
+            'h.tgl_transaksi as tanggaltrx',
+            'd.tanggal as tanggal',
             'h.keterangan',
             'a.nama_akun',
             'd.jml_debit as debet',
@@ -1017,7 +1025,8 @@ public function storetransaksi(Request $request)
 
     $rows = $q
    
-    ->orderBy('d.tanggal', 'asc')
+   ->orderBy('d.tanggal', 'asc')
+    ->orderBy('d.id_detail', 'asc')         
         ->offset(($page - 1) * $perPage)
         ->limit($perPage)
         ->get()
