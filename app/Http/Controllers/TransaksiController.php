@@ -545,7 +545,6 @@ class TransaksiController extends Controller
     $diskonNominal = (float) ($request->diskon_nominal?? 0);
     $pajakPersen   = (float) ($request->pajak_persen ?? 11);
     $afterDisc     = $subtotal - $diskonNominal;
-    // dd($afterDisc);
     $applyPajak    = $request->boolean('apply_pajak');
     $pajakNominal  = $applyPajak ? (float) round($afterDisc * ($pajakPersen / 100)) : 0.0;
     $grandTotal    = max(0, $afterDisc + $pajakNominal + $biayaLain);
@@ -703,12 +702,12 @@ class TransaksiController extends Controller
 
         $kreditMenambahSaldo = ($jenisCode === 2 /* Pembelian/Inventaris */ && $tipePembayaran === 2);
         // Panggil helper jurnal
-       $jenisCode = (int) ($request->jenis_code ?? $request->jenisCode ?? 2);
+        $jurnalJenis = (int) ($request->jenis_code ?? $request->jenisCode ?? $jenisCode); 
 
+       $nominalJurnal = $jurnalJenis === 1
+        ? (float) ($subtotal ?? 0)
+        : (float) ($grandTotal ?? 0);                                              
 
-        $nominalJurnal = $jenisCode === 1
-            ? (float) ($subtotal ?? 0)      
-            : (float) ($grandTotal ?? 0);
         // dd($nominalJurnal);
         $this->insertJurnalSimple(
             $tglSql,
@@ -716,7 +715,7 @@ class TransaksiController extends Controller
             $keterangan,
             $akunDebet,
             $akunKredit,
-            $jenisCode,    
+            $jurnalJenis,     
             1,             
             $noTransaksi,
             $request->tipe,
@@ -745,54 +744,40 @@ class TransaksiController extends Controller
                     ->lockForUpdate()
                     ->increment('saldo_berjalan', (float) $grandTotal);
             }
-             if ($jenisCode === 1 && $totalHppMentah > 0) {
-            DB::table('mst_akun')
-                ->where('id', 3) // akun HPP
-                ->lockForUpdate()
-                ->decrement('saldo_berjalan', (float) $totalHppMentah);
-        }
+            if ($jenisCode === 2 && $tipePembayaran === 2) {                                     // [changes]
+                $kodePemasok = $request->input('kode_pemasok');
+                if (!$kodePemasok && $idKontak) {
+                    $kodePemasok = DB::table('dat_pemasok')
+                        ->where('id_pemasok', $idKontak)
+                        ->value('kode_pemasok');
+                }
 
-            // if ($minAkun63) {
-            //     $periode = Carbon::parse($tglSql)->format('Y-m');
-
-            //     DB::table('mst_akun')
-            //         ->whereIn('id', [6])
-            //         ->lockForUpdate()
-            //         ->decrement('saldo_berjalan', (float) $hargaSatuanTotal);
-            // }
-            
-            if ($jenisCode === 2 && $tipePembayaran === 2) {
-            $kodePemasok = $request->input('kode_pemasok'); // opsional dari form
-            if (!$kodePemasok && $idKontak) {
-               
-                $kodePemasok = DB::table('dat_pemasok')
-                    ->where('id_pemasok', $idKontak)
-                    ->value('kode_pemasok');
+                DB::table('dat_utang')->insert([
+                    'kode_pemasok' => (string) ($kodePemasok ?? ''),
+                    'no_transaksi' => $noTransaksi,
+                    'nominal'      => (float) $grandTotal,
+                    'created_by'   => (int) (auth()->id() ?? 0),
+                    'tanggal'      => $tglSql,
+                    'status'       => 0, // [changes] opsional: jika kolom 'status' sudah ditambahkan
+                ]);
             }
 
-            DB::table('dat_utang')->insert([
-                'kode_pemasok' => (string) ($kodePemasok ?? ''), 
-                'no_transaksi' => $noTransaksi,
-                'nominal'      => (float) $grandTotal,
-                'created_by'   => (int) (auth()->id() ?? 0),
-                'tanggal'      => $tglSql,
-            ]);
-        }
+            // [changes] Penjualan kredit -> PIUTANG
+            if ($jenisCode === 1 && $tipePembayaran === 2) {                                     // [changes]
+                $idPelanggan = (int) ($request->input('pelanggan_id') ?? $idKontak ?? 0);
+
+                DB::table('dat_piutang')->insert([
+                    'id_pelanggan' => $idPelanggan,
+                    'no_transaksi' => $noTransaksi,
+                    'nominal'      => (float) $grandTotal,
+                    'status'       => 0, // 0 = Belum Lunas
+                    'created_by'   => (int) (auth()->id() ?? 0),
+                    'tanggal'      => $tglSql,
+                ]);
+            }
 
      
 
-        if ($jenisCode === 1 && $tipePembayaran === 2) { 
-            $idPelanggan = (int) ($request->input('pelanggan_id') ?? $idKontak ?? 0);
-
-            DB::table('dat_piutang')->insert([
-                'id_pelanggan' => $idPelanggan,
-                'no_transaksi' => $noTransaksi,
-                'nominal'      => (float) $grandTotal,
-                'status'       => 0, // 0 = Belum Lunas
-                'created_by'   => (int) (auth()->id() ?? 0),
-                'tanggal'      => $tglSql,
-            ]);
-        }
 
         DB::commit();
         return response()->json([

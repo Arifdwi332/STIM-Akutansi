@@ -100,6 +100,8 @@
                                     <label>Tipe Transaksi</label>
                                     <select id="tipe_transaksi" class="custom-select">
                                         <!-- Pembayaran Operasional -->
+                                        <option value="Manual">Manual</option>
+
                                         <option value="Bayar Gaji">Bayar Gaji</option>
 
                                         <option value="Bayar Listrik/Telepon/Internet/Air">Bayar
@@ -145,7 +147,6 @@
 
 
 
-                                        <option value="Manual">Manual</option>
                                     </select>
                                 </div>
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\LaporanKeuanganController;
 use App\Http\Controllers\FakturController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BepController;
+use App\Http\Controllers\BukuUtangController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -93,6 +94,22 @@ Route::prefix('bep')->name('bep.')->group(function () {
     Route::get('/', [BepController::class, 'index'])->name('index');
 });
 
+
+Route::get('/buku_hutang', [BukuUtangController::class, 'index'])->name('buku_hutang.index');
+
+// JSON: Buku Utang
+Route::prefix('buku_hutang')->group(function () {
+    Route::get('/data', [BukuUtangController::class, 'data'])->name('buku_hutang.data');
+    // referensi dropdown pemasok
+    Route::get('/ref/pemasok', [BukuUtangController::class, 'refPemasok'])->name('buku_hutang.ref_pemasok');
+});
+
+// JSON: Buku Piutang
+Route::prefix('buku_piutang')->group(function () {
+    Route::get('/datapiutang', [BukuUtangController::class, 'dataPiutang'])->name('buku_piutang.data');
+    // referensi dropdown pelanggan
+    Route::get('/ref/pelanggan', [BukuUtangController::class, 'refPelanggan'])->name('buku_piutang.ref_pelanggan');
+});
 
 
 
