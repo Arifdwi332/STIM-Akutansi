@@ -181,7 +181,7 @@
                             const nama = String(r.nama_akun ?? '').toLowerCase();
                             const kode = String(r.kode_akun ?? '');
 
-                            // pakai 'jenis' dari BE kalau ada; fallback heuristik
+                            // pakai r.jenis dari BE kalau ada; kalau tidak, fallback
                             let jenis = r.jenis;
                             if (!jenis) {
                                 const isPendapatan = kat === 'pendapatan';
@@ -189,17 +189,15 @@
                                     .test(nama));
                                 const isPenjualan = isPendapatan && (/(penjualan|sales)/i.test(nama) ||
                                     /^(40|41)\d{2,}$/.test(kode));
-
                                 if (isPendapatan) jenis = isPenjualan ? 'penjualan' : 'pendapatan_lain';
                                 else jenis = isHpp ? 'hpp' : 'beban';
                             }
 
-                            // nilai positif untuk tampilan, tapi tetap logika debit/kredit
+                            // nilai basis (positif untuk tampilan)
                             const nilai = (jenis === 'penjualan' || jenis === 'pendapatan_lain') ?
                                 (kredit - debet) // pendapatan
                                 :
-                                (debet - kredit); // HPP/beban
-
+                                (debet - kredit); // HPP/Beban
                             return {
                                 nama: r.nama_akun ?? '',
                                 jenis,
@@ -208,56 +206,67 @@
                         }).filter(i => i.nilai > 0);
 
                         const penjualan = items.filter(i => i.jenis === 'penjualan');
-                        const hpp = items.filter(i => i.jenis ===
-                            'hpp'); // tampil di bawah penjualan (dlm seksi PENDAPATAN)
+                        const hpp = items.filter(i => i.jenis === 'hpp');
                         const pendLain = items.filter(i => i.jenis === 'pendapatan_lain');
                         const beban = items.filter(i => i.jenis === 'beban');
 
                         const totalPenjualan = penjualan.reduce((s, i) => s + i.nilai, 0);
                         const totalHPP = hpp.reduce((s, i) => s + i.nilai, 0);
-                        const labaKotor = totalPenjualan - totalHPP;
-
                         const totalPendLain = pendLain.reduce((s, i) => s + i.nilai, 0);
+
+                        // >>> Total Pendapatan NET: penjualan + pendapatan lain - HPP
+                        const totalPendapatanNet = totalPenjualan + totalPendLain - totalHPP;
+
                         const totalBeban = beban.reduce((s, i) => s + i.nilai, 0);
-                        const labaBersih = labaKotor + totalPendLain - totalBeban;
+                        const labaBersih = totalPendapatanNet - totalBeban;
 
                         if ($('#tblJurnal tbody').length === 0) $('#tblJurnal').append('<tbody></tbody>');
                         const $body = $('#tblJurnal tbody').empty();
 
-                        // ===== PENDAPATAN =====
+                        // ====== PENDAPATAN ======
                         $body.append(`<tr class="row-section"><td colspan="2" class="pl-0">Pendapatan</td></tr>`);
-                        // Penjualan Barang Dagang
-                        if (penjualan.length === 0) $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
-                        else penjualan.forEach(i => $body.append(
-                            `<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+
+                        // 1) Penjualan Barang Dagang
+                        if (penjualan.length === 0) {
+                            $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                        } else {
+                            penjualan.forEach(i => $body.append(
+                                `<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+                        }
                         $body.append(
                             `<tr class="row-total"><td>Total Penjualan</td><td>${rp(totalPenjualan)}</td></tr>`);
 
-                        // HPP ditaruh DI BAWAH Penjualan (tetap sebagai beban, hanya posisi tampilan)
-                        $body.append(
-                            `<tr class="row-section"><td colspan="2">Harga Pokok Penjualan (HPP)</td></tr>`);
-                        if (hpp.length === 0) $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
-                        else hpp.forEach(i => $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
-                        $body.append(`<tr class="row-total"><td>Total HPP</td><td>${rp(totalHPP)}</td></tr>`);
-                        $body.append(`<tr class="row-total"><td>Laba Kotor</td><td>${rp(labaKotor)}</td></tr>`);
-
-                        // Pendapatan lain (kalau ada)
-                        if (pendLain.length) {
-                            $body.append(`<tr class="row-section"><td colspan="2">Pendapatan Lain</td></tr>`);
-                            pendLain.forEach(i => $body.append(
-                                `<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+                        // 2) HPP — ditempatkan persis DI BAWAH penjualan (tanpa header), sebagai pengurang
+                        hpp.forEach(i => {
                             $body.append(
-                                `<tr class="row-total"><td>Total Pendapatan Lain</td><td>${rp(totalPendLain)}</td></tr>`
+                                `<tr>
+             <td class="text-muted">(-) ${i.nama}</td>
+             <td class="text-end text-danger">- ${rp(i.nilai)}</td>
+           </tr>`
                             );
-                        }
+                        });
 
-                        // ===== Beban Operasional =====
+                        // 3) Pendapatan lain (jika ada)
+                        pendLain.forEach(i => $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+
+                        // 4) Total Pendapatan setelah HPP
+                        $body.append(
+                            `<tr class="row-total">
+           <td>Total Pendapatan</td>
+           <td>${rp(totalPendapatanNet)}</td>
+         </tr>`
+                        );
+
+                        // ====== BEBAN OPERASIONAL ======
                         $body.append(`<tr class="row-section"><td colspan="2">Beban Operasional</td></tr>`);
-                        if (beban.length === 0) $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
-                        else beban.forEach(i => $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+                        if (beban.length === 0) {
+                            $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                        } else {
+                            beban.forEach(i => $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+                        }
                         $body.append(`<tr class="row-total"><td>Total Beban</td><td>${rp(totalBeban)}</td></tr>`);
 
-                        // ===== Laba/Rugi Bersih =====
+                        // ====== Laba/Rugi Bersih ======
                         $body.append(
                             `<tr class="row-grand"><td>Total Laba/Rugi</td><td>${rp(labaBersih)}</td></tr>`);
 

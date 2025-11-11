@@ -262,6 +262,48 @@
                 n = Number(n || 0);
                 return 'Rp ' + n.toLocaleString('id-ID');
             }
+
+            let akunLoaded = false;
+
+            function loadAkunList(force = false) {
+                if (akunLoaded && !force) return $.Deferred().resolve();
+
+                return $.get('/buku_besar/mst_akun')
+                    .done(function(res) {
+                        $deb.empty().append('<option value="" disabled selected>Pilih Akun Debet</option>');
+                        $kred.empty().append('<option value="" disabled selected>Pilih Akun Kredit</option>');
+
+                        if (res?.ok && Array.isArray(res.data) && res.data.length) {
+                            res.data.forEach(function(a) {
+                                const text = (a.kode_akun ? (a.kode_akun + ' - ') : '') + (a
+                                    .nama_akun || 'Tanpa Nama');
+                                const opt = $('<option/>').val(a.id).text(text);
+                                $deb.append(opt.clone());
+                                $kred.append(opt.clone());
+                            });
+                            akunLoaded = true;
+                            syncDisableAkun();
+                        } else {
+                            $deb.append('<option value="" disabled>Tidak ada data akun</option>');
+                            $kred.append('<option value="" disabled>Tidak ada data akun</option>');
+                        }
+                    })
+                    .fail(function() {
+                        $deb.empty().append('<option value="" disabled>Gagal memuat akun</option>');
+                        $kred.empty().append('<option value="" disabled>Gagal memuat akun</option>');
+                    });
+            }
+
+            function syncDisableAkun() {
+                const d = $deb.val();
+                const k = $kred.val();
+                $deb.find('option').prop('disabled', false);
+                $kred.find('option').prop('disabled', false);
+                if (d) $kred.find('option[value="' + d + '"]').prop('disabled', true);
+                if (k) $deb.find('option[value="' + k + '"]').prop('disabled', true);
+            }
+            $deb.on('change', syncDisableAkun); // [change]
+            $kred.on('change', syncDisableAkun); // [change]
             let suppliersLoaded = false;
 
             function loadKodePemasokList(force = false) {
@@ -315,10 +357,12 @@
                 // Manual
                 if (val === 'Manual') {
                     $('#rowManualAccounts').show();
+                    loadAkunList().always(syncDisableAkun);
                 } else {
                     $('#rowManualAccounts').hide();
                     $deb.val('');
                     $kred.val('');
+                    syncDisableAkun();
                 }
 
                 // Utang Usaha (supplier)

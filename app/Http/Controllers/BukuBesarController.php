@@ -593,7 +593,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => $nominal,
                     'jml_kredit'     => 0,
-                    'tanggal' => $tanggal,
+                    
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -604,7 +604,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => 0,
                     'jml_kredit'     => $nominal,
-                    'tanggal' => $tanggal,
+                    
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
