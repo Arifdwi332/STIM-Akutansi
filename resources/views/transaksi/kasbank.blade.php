@@ -118,8 +118,8 @@
 
                                         <!-- Utang & Bunga -->
                                         <option value="Bayar Utang Bank">Bayar Utang Bank</option>
-                                        <option value="Bayar Utang Usaha">Bayar Utang Usaha</option>
-                                        <option value="Bayar Piutang Usaha">Bayar Piutang Usaha</option>
+                                        <option value="Bayar Utang Usaha">Bayar Utang Pemasok</option>
+                                        <option value="Bayar Piutang Usaha">Terima Piutang Pelanggan</option>
                                         <option value="Bayar Utang Lainnya">Bayar Utang Lainnya</option>
                                         <option value="Bayar Bunga Bank">Bayar Bunga Bank</option>
 

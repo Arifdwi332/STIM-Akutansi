@@ -162,7 +162,6 @@
                 const toNum = v => Number(String(v ?? 0).replace(/[^\d.-]/g, '')) || 0;
                 const rp = n => 'Rp. ' + toNum(n).toLocaleString('id-ID');
 
-                // ====== LABA RUGI ======
                 function loadLabaRugi(page = 1) {
                     const q = $('#searchJurnal').val() || '';
                     const url = "{{ route('laporan_keuangan.get_laba_rugi') }}";
@@ -174,63 +173,96 @@
                     }, function(res) {
                         const rows = res?.data || [];
 
-                        // Normalisasi & klasifikasi
+                        // klasifikasi: penjualan | hpp | pendapatan_lain | beban
                         const items = rows.map(r => {
-                            const kat = (r.kategori_akun || '').toLowerCase();
-                            const debet = Number(r.debet ?? r.debit ?? r.jml_debit ?? 0);
-                            const kredit = Number(r.kredit ?? r.credit ?? r.jml_kredit ?? 0);
-                            const isPendapatan = kat === 'pendapatan';
-                            const nilai = isPendapatan ? (kredit - debet) : (debet - kredit);
+                            const debet = Number(r.debet ?? 0);
+                            const kredit = Number(r.kredit ?? 0);
+                            const kat = String(r.kategori_akun ?? '').toLowerCase();
+                            const nama = String(r.nama_akun ?? '').toLowerCase();
+                            const kode = String(r.kode_akun ?? '');
+
+                            // pakai 'jenis' dari BE kalau ada; fallback heuristik
+                            let jenis = r.jenis;
+                            if (!jenis) {
+                                const isPendapatan = kat === 'pendapatan';
+                                const isHpp = (kode === '5104' || Number(kode) === 5104 || /hpp|harga pokok/
+                                    .test(nama));
+                                const isPenjualan = isPendapatan && (/(penjualan|sales)/i.test(nama) ||
+                                    /^(40|41)\d{2,}$/.test(kode));
+
+                                if (isPendapatan) jenis = isPenjualan ? 'penjualan' : 'pendapatan_lain';
+                                else jenis = isHpp ? 'hpp' : 'beban';
+                            }
+
+                            // nilai positif untuk tampilan, tapi tetap logika debit/kredit
+                            const nilai = (jenis === 'penjualan' || jenis === 'pendapatan_lain') ?
+                                (kredit - debet) // pendapatan
+                                :
+                                (debet - kredit); // HPP/beban
+
                             return {
-                                nama: r.nama_akun ?? r.namaAkun ?? r.nama ?? '',
-                                jenis: isPendapatan ? 'pendapatan' : 'beban',
+                                nama: r.nama_akun ?? '',
+                                jenis,
                                 nilai: Math.max(0, nilai)
                             };
                         }).filter(i => i.nilai > 0);
 
-                        const pendapatan = items.filter(i => i.jenis === 'pendapatan');
+                        const penjualan = items.filter(i => i.jenis === 'penjualan');
+                        const hpp = items.filter(i => i.jenis ===
+                            'hpp'); // tampil di bawah penjualan (dlm seksi PENDAPATAN)
+                        const pendLain = items.filter(i => i.jenis === 'pendapatan_lain');
                         const beban = items.filter(i => i.jenis === 'beban');
 
-                        const totalPendapatan = pendapatan.reduce((s, i) => s + i.nilai, 0);
-                        const totalBeban = beban.reduce((s, i) => s + i.nilai, 0);
-                        const labaRugi = totalPendapatan - totalBeban;
+                        const totalPenjualan = penjualan.reduce((s, i) => s + i.nilai, 0);
+                        const totalHPP = hpp.reduce((s, i) => s + i.nilai, 0);
+                        const labaKotor = totalPenjualan - totalHPP;
 
-                        // --- render seperti Neraca (tbody berisi bar section + item + total) ---
+                        const totalPendLain = pendLain.reduce((s, i) => s + i.nilai, 0);
+                        const totalBeban = beban.reduce((s, i) => s + i.nilai, 0);
+                        const labaBersih = labaKotor + totalPendLain - totalBeban;
+
                         if ($('#tblJurnal tbody').length === 0) $('#tblJurnal').append('<tbody></tbody>');
                         const $body = $('#tblJurnal tbody').empty();
 
-                        // Section: Pendapatan
+                        // ===== PENDAPATAN =====
                         $body.append(`<tr class="row-section"><td colspan="2" class="pl-0">Pendapatan</td></tr>`);
-                        if (pendapatan.length === 0) {
-                            $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
-                        } else {
-                            pendapatan.forEach(i => {
-                                $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`);
-                            });
-                        }
+                        // Penjualan Barang Dagang
+                        if (penjualan.length === 0) $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                        else penjualan.forEach(i => $body.append(
+                            `<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
                         $body.append(
-                            `<tr class="row-total"><td>Total Pendapatan</td><td>${rp(totalPendapatan)}</td></tr>`
-                        );
+                            `<tr class="row-total"><td>Total Penjualan</td><td>${rp(totalPenjualan)}</td></tr>`);
 
-                        // Section: Beban Operasional
-                        $body.append(`<tr class="row-section"><td colspan="2">Beban Operasional</td></tr>`);
-                        if (beban.length === 0) {
-                            $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
-                        } else {
-                            beban.forEach(i => {
-                                $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`);
-                            });
+                        // HPP ditaruh DI BAWAH Penjualan (tetap sebagai beban, hanya posisi tampilan)
+                        $body.append(
+                            `<tr class="row-section"><td colspan="2">Harga Pokok Penjualan (HPP)</td></tr>`);
+                        if (hpp.length === 0) $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                        else hpp.forEach(i => $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+                        $body.append(`<tr class="row-total"><td>Total HPP</td><td>${rp(totalHPP)}</td></tr>`);
+                        $body.append(`<tr class="row-total"><td>Laba Kotor</td><td>${rp(labaKotor)}</td></tr>`);
+
+                        // Pendapatan lain (kalau ada)
+                        if (pendLain.length) {
+                            $body.append(`<tr class="row-section"><td colspan="2">Pendapatan Lain</td></tr>`);
+                            pendLain.forEach(i => $body.append(
+                                `<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
+                            $body.append(
+                                `<tr class="row-total"><td>Total Pendapatan Lain</td><td>${rp(totalPendLain)}</td></tr>`
+                            );
                         }
+
+                        // ===== Beban Operasional =====
+                        $body.append(`<tr class="row-section"><td colspan="2">Beban Operasional</td></tr>`);
+                        if (beban.length === 0) $body.append(`<tr><td>-</td><td>Rp. 0</td></tr>`);
+                        else beban.forEach(i => $body.append(`<tr><td>${i.nama}</td><td>${rp(i.nilai)}</td></tr>`));
                         $body.append(`<tr class="row-total"><td>Total Beban</td><td>${rp(totalBeban)}</td></tr>`);
 
-                        // Grand total
-                        $body.append(`<tr class="row-grand"><td>Total Laba/Rugi</td><td>${rp(labaRugi)}</td></tr>`);
+                        // ===== Laba/Rugi Bersih =====
+                        $body.append(
+                            `<tr class="row-grand"><td>Total Laba/Rugi</td><td>${rp(labaBersih)}</td></tr>`);
 
-                        // footer
                         $('#pgJurnal').text(`Total baris: ${rows.length} | Hal: ${res.page ?? 1}`);
-                    }).fail(function(xhr) {
-                        console.error('loadLabaRugi error:', xhr?.responseText || xhr.statusText);
-                    });
+                    }).fail(xhr => console.error('loadLabaRugi error:', xhr?.responseText || xhr.statusText));
                 }
 
                 $('#searchJurnal').on('input', () => loadLabaRugi(1));
