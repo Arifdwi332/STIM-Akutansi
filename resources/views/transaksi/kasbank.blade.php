@@ -119,11 +119,11 @@
                                         <!-- Utang & Bunga -->
                                         <option value="Bayar Utang Bank">Bayar Utang Bank</option>
                                         <option value="Bayar Utang Usaha">BAYAR UTANG PEMASOK</option>
-                                        <option value="Bayar Piutang Usaha">TERIMA UTANG PELANGGAN</option>
+                                        <option value="Bayar Piutang Usaha">TERIMA PIUTANG PELANGGAN</option>
                                         <option value="Bayar Utang Lainnya">Bayar Utang Lainnya</option>
                                         <option value="Bayar Bunga Bank">Bayar Bunga Bank</option>
 
-                                        <!-- Pembelian Aset / Barang -->
+
                                         <option value="Beli Peralatan Tunai">Beli Peralatan Tunai</option>
                                         <option value="Beli ATK Tunai">Beli ATK Tunai</option>
                                         <option value="Beli Tanah Tunai">Beli Tanah Tunai</option>
