@@ -833,7 +833,7 @@ private function insertJurnalSimple(
             'created_at'    => $now,
             'updated_at'    => $now,
         ]);
-
+$jenisLaporanDebet = 2;
 
         DB::table('dat_detail_jurnal')->insert([
             [
