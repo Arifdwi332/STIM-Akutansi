@@ -100,7 +100,7 @@
                                     <label>Tipe Transaksi</label>
                                     <select id="tipe_transaksi" class="custom-select">
                                         <!-- Pembayaran Operasional -->
-                                        <option value="Manual">Manual</option>
+                                        <option value="Manual">MANUAL</option>
 
                                         <option value="Bayar Gaji">Bayar Gaji</option>
 
@@ -118,8 +118,8 @@
 
                                         <!-- Utang & Bunga -->
                                         <option value="Bayar Utang Bank">Bayar Utang Bank</option>
-                                        <option value="Bayar Utang Usaha">Bayar Utang Pemasok</option>
-                                        <option value="Bayar Piutang Usaha">Terima Piutang Pelanggan</option>
+                                        <option value="Bayar Utang Usaha">BAYAR UTANG PEMASOK</option>
+                                        <option value="Bayar Piutang Usaha">TERIMA UTANG PELANGGAN</option>
                                         <option value="Bayar Utang Lainnya">Bayar Utang Lainnya</option>
                                         <option value="Bayar Bunga Bank">Bayar Bunga Bank</option>
 
