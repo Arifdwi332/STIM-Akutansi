@@ -475,7 +475,7 @@ class TransaksiController extends Controller
 
 
 
-   public function store(Request $request)
+public function store(Request $request)
 {
     $request->validate([
         'tipe'                 => ['required', Rule::in(['Penjualan','Inventaris'])],
@@ -603,22 +603,23 @@ class TransaksiController extends Controller
                 throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
             }
 
-            $base           = (float) $it['total'];
-            $afterDiscItem  = $base - $diskonNominal; // (catatan: diskon global belum diproporsikan)
-            $share          = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
-            $pajakItem      = $applyPajak ? (int) round($afterDiscItem * ($pajakPersen / 100)) : 0;
-            $biayaItem      = (int) round($biayaLain * $share);
-
+               $base = (float) $it['total'];
+            $afterDiscItem = $base - $diskonNominal;
+            $share = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
+            $pajakItem = $applyPajak ? (int) round($afterDiscItem * ($pajakPersen / 100)) : 0;
+            $biayaItem = (int) round($biayaLain * $share);
+            $hargaSatuan = (float) ($barang->harga_satuan ?? 0);
+            $hargaSatuanTotal   = (float) round($hargaSatuan * (float) $it['qty']); 
             if ($isLast) {
-                // Samakan total pajak & biaya agar presisi
                 $pajakItem = $applyPajak ? (int) ($pajakNominal - $runningPajak) : 0;
                 $biayaItem = (int) ($biayaLain - $runningBiaya);
             }
 
-            // HPP: pakai harga_mentah dari FE bila ada, fallback ke harga_satuan barang
-            $hargaMentahSrc = isset($it['harga_mentah']) ? (float) $it['harga_mentah'] : (float) ($barang->harga_satuan ?? 0);
-            $hppRow         = (float) round($hargaMentahSrc * (float) $it['qty']);
-            $totalHppMentah += $hppRow;
+            $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
+           $hargaMentahSrc = $hargaSatuan;
+            $hppRow = (float) round($hargaMentahSrc * (float) $it['qty']);
+            $totalHppMentah += $hppRow;  
+            
 
             $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
 
@@ -904,12 +905,6 @@ private function insertJurnalSimple(
             ->update(['saldo_berjalan' => $saldoKreditAfter, 'updated_at' => $now]);
     });
 }
-
-
-
-
-
-
 
 public function datatableTransaksi(Request $r) // [CHANGES] terima Request
 {
