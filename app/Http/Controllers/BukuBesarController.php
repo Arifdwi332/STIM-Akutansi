@@ -555,13 +555,18 @@ public function storetransaksi(Request $request)
         // =========================
         if ($tipe === 'Manual') {
 
-            // validasi saldo kas
-            if ($akunK == 1) {
-                $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
+          if ($akunK == 1) {
+                $saldoKas = (float) DB::table('mst_akun')
+                    ->where('id', 1)
+                    ->where('created_by', $userId)   // filter multi user
+                    ->lockForUpdate()
+                    ->value('saldo_berjalan');
+
                 if ($saldoKas < $nominal) {
                     throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi ini.");
                 }
             }
+
 
             // === 1) HEADER JURNAL ===
             $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
@@ -798,11 +803,17 @@ public function storetransaksi(Request $request)
                 'updated_at'       => now(),
             ]);
             if ($akunK == 1) {
-                $saldoKas = (float) DB::table('mst_akun')->where('id', 1)->lockForUpdate()->value('saldo_berjalan');
+                $saldoKas = (float) DB::table('mst_akun')
+                    ->where('id', 1)
+                    ->where('created_by', $userId)   // ⬅️ filter per user
+                    ->lockForUpdate()
+                    ->value('saldo_berjalan');
+
                 if ($saldoKas < $nominal) {
                     throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
                 }
             }
+
             // === DETAIL TRANSAKSI ===
             DB::table('dat_detail_transaksi')->insert([
                 [
