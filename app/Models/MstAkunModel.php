@@ -26,6 +26,7 @@ class MstAkunModel extends Model
         'saldo_awal',
         'saldo_berjalan',
         'status_aktif',
+        'created_by',
     ];
 
     // Casting kolom tertentu

@@ -115,3 +115,6 @@ Route::prefix('buku_piutang')->group(function () {
 Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('mstuser.register');
 Route::post('/register', [AuthController::class, 'register'])->name('mstuser.register.store');
 
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('mstuser.login');
+Route::post('/login', [AuthController::class, 'login'])->name('mstuser.login.process');
+
