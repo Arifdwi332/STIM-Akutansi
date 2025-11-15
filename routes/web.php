@@ -8,6 +8,7 @@ use App\Http\Controllers\FakturController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BepController;
 use App\Http\Controllers\BukuUtangController;
+use App\Http\Controllers\AuthController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -111,5 +112,6 @@ Route::prefix('buku_piutang')->group(function () {
     Route::get('/ref/pelanggan', [BukuUtangController::class, 'refPelanggan'])->name('buku_piutang.ref_pelanggan');
 });
 
-
+Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('mstuser.register');
+Route::post('/register', [AuthController::class, 'register'])->name('mstuser.register.store');
 

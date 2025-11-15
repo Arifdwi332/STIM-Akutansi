@@ -134,14 +134,14 @@ class LaporanKeuanganController extends Controller
 
         // Ambil data langsung dari model
         $query = MstAkunModel::query()
-            ->select('id', 'nama_akun', 'kategori_akun', 'saldo_berjalan')
+            ->select('id', 'nama_akun', 'kategori_akun', 'saldo_berjalan', 'kode_akun')
             ->when($q !== '', function ($w) use ($q) {
                 $like = '%'.$q.'%';
                 $w->where('nama_akun', 'like', $like)
                 ->orWhere('kategori_akun', 'like', $like);
             })
             ->orderBy('kategori_akun')
-            ->orderBy('nama_akun');
+            ->orderBy('kode_akun', 'asc');
 
         $all = $query->get()
             ->map(function ($r) {

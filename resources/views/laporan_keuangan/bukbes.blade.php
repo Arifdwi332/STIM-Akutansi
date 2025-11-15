@@ -248,9 +248,11 @@
         (function() {
             const rp = n => 'Rp. ' + Number(n || 0).toLocaleString('id-ID');
 
-            function loadJurnalDetail(akunId = null, akunName = '') {
+            function loadJurnalDetail(akunId = null, akunName = '', kodeAkun = '') {
                 $('#tblDetailBody').html(
-                    '<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>');
+                    '<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>'
+                );
+
                 const payload = {
                     per_page: 100
                 };
@@ -265,20 +267,29 @@
                         );
                         return;
                     }
+
                     res.data.forEach(r => {
+                        let saldoView = Number(r.saldo || 0);
+
+                        // pakai kodeAkun dari baris yang diklik
+                        if (String(kodeAkun) === '4101') {
+                            saldoView = Math.abs(saldoView); // -6000 -> 6000
+                        }
+
                         $body.append(`
-                    <tr>
-                        <td>${r.tanggal ?? ''}</td>
-                        <td>${r.keterangan ?? ''}</td>
-                        <td>${r.nama_akun ?? ''}</td>
-                        <td class="text-success">${rp(r.debet)}</td>
-                        <td class="text-danger">${rp(r.kredit)}</td>
-                        <td>${rp(r.saldo)}</td>
-                    </tr>
-                `);
+                <tr>
+                    <td>${r.tanggal ?? ''}</td>
+                    <td>${r.keterangan ?? ''}</td>
+                    <td>${r.nama_akun ?? ''}</td>
+                    <td class="text-success">${rp(r.debet)}</td>
+                    <td class="text-danger">${rp(r.kredit)}</td>
+                    <td>${rp(saldoView)}</td>
+                </tr>
+            `);
                     });
                 });
             }
+
 
             function loadBuku(page = 1) {
                 const q = $('#searchBuku').val() || '';
@@ -291,29 +302,38 @@
                     const $body = $('#tblBuku tbody').empty();
 
                     (res.data || []).forEach(r => {
-                        // [changes] simpan id & name ke data-*
+                        // saldo di tabel utama (boleh sekalian dibenerin juga)
+                        let saldoView = Number(r.saldo || 0);
+                        if (String(r.kode_akun) === '4101') {
+                            saldoView = Math.abs(saldoView);
+                        }
+
                         const row = $(`
-                    <tr class="clickable-row" style="cursor:pointer"
-                        data-akun-id="${r.id_akun ?? ''}"
-                        data-akun-name="${r.nama_akun ?? ''}">
-                        <td>${r.nama_akun ?? ''}</td>
-                        <td>${r.tanggal ?? ''}</td>
-                        <td class="text-success">${rp(r.debet)}</td>
-                        <td class="text-danger">${rp(r.kredit)}</td>
-                        <td>${rp(r.saldo)}</td>
-                    </tr>
-                `);
+                            <tr class="clickable-row" style="cursor:pointer"
+                                data-akun-id="${r.id_akun ?? ''}"
+                                data-akun-name="${r.nama_akun ?? ''}"
+                                data-kode-akun="${r.kode_akun ?? ''}">
+                                <td>${r.nama_akun ?? ''}</td>
+                                <td>${r.tanggal ?? ''}</td>
+                                <td class="text-success">${rp(r.debet)}</td>
+                                <td class="text-danger">${rp(r.kredit)}</td>
+                                <td>${rp(saldoView)}</td>
+                            </tr>
+                        `);
                         $body.append(row);
                     });
 
-                    // [changes] klik baris: pakai akun_id bila ada, fallback ke nama
+
                     $('.clickable-row').off('click').on('click', function() {
                         const akunId = $(this).data('akun-id') || null;
                         const akunName = $(this).data('akun-name') || '';
+                        const kodeAkun = $(this).data('kode-akun') || ''; // <─ ambil kode akun
+
                         $('#modalDetail .modal-title').text(`Detail - ${akunName || 'Akun'}`);
-                        loadJurnalDetail(akunId, akunName);
+                        loadJurnalDetail(akunId, akunName, kodeAkun); // <─ kirim ke detail
                         $('#modalDetail').modal('show');
                     });
+
 
                     $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);
                 });

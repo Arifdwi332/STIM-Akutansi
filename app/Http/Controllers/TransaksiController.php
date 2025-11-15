@@ -557,7 +557,6 @@ public function store(Request $request)
     $noTransaksi = trim((string) $request->no_transaksi);
 
     if ($request->tipe === 'Inventaris') {
-        // PEMBELIAN: wajib input & unik
         if ($noTransaksi === '') {
             return response()->json(['ok' => false, 'message' => 'No transaksi wajib diisi untuk pembelian'], 422);
         }
@@ -565,7 +564,6 @@ public function store(Request $request)
             return response()->json(['ok' => false, 'message' => 'No transaksi sudah digunakan'], 422);
         }
     } else {
-        // PENJUALAN: auto-generate (prefix P)
         $valid = preg_match('/^P\d{7}$/', $noTransaksi);
         if (!$valid) {
             $lastNo = DB::table('dat_transaksi')
@@ -616,7 +614,7 @@ public function store(Request $request)
             }
 
             $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
-           $hargaMentahSrc = $hargaSatuan;
+            $hargaMentahSrc = $hargaSatuan;
             $hppRow = (float) round($hargaMentahSrc * (float) $it['qty']);
             $totalHppMentah += $hppRow;  
             
@@ -746,6 +744,14 @@ public function store(Request $request)
                 ->lockForUpdate()
                 ->increment('saldo_berjalan', (float) $grandTotal);
         }
+
+        
+         if ($hppRow > 0) {
+             DB::table('mst_akun')
+            ->where('id', 17)
+            ->lockForUpdate()
+            ->decrement('saldo_berjalan', $hppRow);
+         }
 
         // Pembelian Kredit → Utang
         if ($jenisCode === 2 && $tipePembayaran === 2) {
