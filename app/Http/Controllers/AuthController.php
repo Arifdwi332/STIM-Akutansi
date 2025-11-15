@@ -37,6 +37,7 @@ class AuthController extends Controller
 
             foreach ($templateAkuns as $tmpl) {
                 MstAkunModel::create([
+                    'id'             => $tmpl->id,    
                     'kode_akun'      => $tmpl->kode_akun,
                     'nama_akun'      => $tmpl->nama_akun,
                     'kategori_akun'  => $tmpl->kategori_akun ?? null,

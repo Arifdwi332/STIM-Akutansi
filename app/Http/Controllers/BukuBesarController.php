@@ -7,7 +7,7 @@ use Yajra\DataTables\Facades\DataTables;
 use App\Models\MstAkunModel;
 use App\Models\PemasokModel;
 use App\Models\PelangganModel;
-use App\Models\DatAkunModel;
+
 use App\Models\DatBarangModel;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -41,6 +41,7 @@ class BukuBesarController extends Controller
             'saldo_awal'     => $data['saldo_awal'] ?? '0',
             'saldo_berjalan' => $data['saldo_berjalan'] ?? '0',
             'status_aktif'   => (bool)($data['status_aktif'] ?? 1),
+            'created_by'     => $userId,
         ]);
 
         return response()->json([
@@ -51,8 +52,9 @@ class BukuBesarController extends Controller
 
      public function listMstAkun()
     {
-        $items = MstAkunModel::orderBy('kode_akun')
-            ->get(['id','kode_akun','nama_akun']);
+       $items = MstAkunModel::where('created_by', $this->userId)
+        ->orderBy('kode_akun')
+        ->get(['id','kode_akun','nama_akun']);
 
         return response()->json([
             'ok'   => true,
@@ -100,6 +102,7 @@ class BukuBesarController extends Controller
     $masters = MstAkunModel::with([
         'subAkuns:id,mst_akun_id,kode_sub,nama_sub'
     ])
+    ->where('created_by', $this->userId)
     ->orderBy('kode_akun')
     ->get(['id','kode_akun','nama_akun','kategori_akun']);
 
@@ -175,11 +178,17 @@ public function storeSaldoAwal(Request $r)
         $total += (int)$nominal[$i];
     }
 
+     $userId = $this->userId;
+        
     try {
-        DB::transaction(function () use ($mstId, $subIds, $nominal, $tanggal, $count, $total) {
+        DB::transaction(function () use ($mstId, $subIds, $nominal, $tanggal, $count, $total, $userId) {
 
             /** @var MstAkunModel $mst */
-            $mst = MstAkunModel::lockForUpdate()->findOrFail($mstId);
+          $mst = MstAkunModel::where('created_by', $userId)
+                ->where('id', $mstId)      // [CHANGES] filter pakai kolom id
+                ->lockForUpdate()
+                ->firstOrFail();
+
 
             $toInt = static function($v){
                 return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
@@ -193,7 +202,10 @@ public function storeSaldoAwal(Request $r)
 
             // Akun pasangan: Modal 3101
             /** @var MstAkunModel $modalAcc */
-            $modalAcc = MstAkunModel::where('kode_akun', '3101')->lockForUpdate()->firstOrFail();
+            $modalAcc = MstAkunModel::where('kode_akun', '3101')
+                ->where('created_by', $userId)   
+                ->lockForUpdate()
+                ->firstOrFail();
             $modalId  = (int) $modalAcc->id;
 
             // Update saldo akun induk
@@ -204,28 +216,28 @@ public function storeSaldoAwal(Request $r)
             $mst->save();
 
             // Update saldo sub-akun (jika ada)
-            $bySub = [];
-            for ($i=0; $i<$count; $i++) {
-                $sid = $subIds[$i] ?? null;
-                $val = $nominal[$i] ?? 0;
-                if (!$sid || $val <= 0) continue;
-                $bySub[$sid] = ($bySub[$sid] ?? 0) + $val;
-            }
+            // $bySub = [];
+            // for ($i=0; $i<$count; $i++) {
+            //     $sid = $subIds[$i] ?? null;
+            //     $val = $nominal[$i] ?? 0;
+            //     if (!$sid || $val <= 0) continue;
+            //     $bySub[$sid] = ($bySub[$sid] ?? 0) + $val;
+            // }
 
-            if (!empty($bySub)) {
-                $subs = DatAkunModel::whereIn('id', array_keys($bySub))
-                        ->lockForUpdate()
-                        ->get();
+            // if (!empty($bySub)) {
+            //     $subs = DatAkunModel::whereIn('id', array_keys($bySub))
+            //             ->lockForUpdate()
+            //             ->get();
 
-                foreach ($subs as $sub) {
-                    $sAwal  = $toInt($sub->saldo_awal ?? '0');
-                    $sJalan = $toInt($sub->saldo_berjalan ?? '0');
-                    $add    = $bySub[$sub->id];
-                    $sub->saldo_awal     = (string)($sAwal + $add);
-                    $sub->saldo_berjalan = (string)($sJalan + $add);
-                    $sub->save();
-                }
-            }
+            //     foreach ($subs as $sub) {
+            //         $sAwal  = $toInt($sub->saldo_awal ?? '0');
+            //         $sJalan = $toInt($sub->saldo_berjalan ?? '0');
+            //         $add    = $bySub[$sub->id];
+            //         $sub->saldo_awal     = (string)($sAwal + $add);
+            //         $sub->saldo_berjalan = (string)($sJalan + $add);
+            //         $sub->save();
+            //     }
+            // }
 
             // ===== Agregasi per-periode (periode diambil dari TANGGAL REQUEST) =====
             $aggPerPeriode = [];  // ['YYYY-MM' => ['debit'=>x, 'kredit'=>y]]
@@ -260,9 +272,10 @@ public function storeSaldoAwal(Request $r)
             }
 
             // Helper akumulasi buku besar (builder baru tiap call)
-            $applyBB = static function (int $akunId, string $periode, int $debit, int $kredit) use ($toInt) {
+            $applyBB = static function (int $akunId, string $periode, int $debit, int $kredit) use ($toInt, $userId) {
                 $row = DB::table('dat_buku_besar')
                     ->lockForUpdate()
+                    ->where('created_by', $userId)
                     ->where('id_akun', $akunId)
                     ->where('periode', $periode)
                     ->first();
@@ -272,6 +285,7 @@ public function storeSaldoAwal(Request $r)
                     $newKredit = $toInt($row->ttl_kredit) + $kredit;
 
                     DB::table('dat_buku_besar')
+                        ->where('created_by', $userId)
                         ->where('id_akun', $akunId)
                         ->where('periode', $periode)
                         ->update([
@@ -287,6 +301,7 @@ public function storeSaldoAwal(Request $r)
                         'ttl_debit'   => (string) $debit,
                         'ttl_kredit'  => (string) $kredit,
                         'saldo_akhir' => (string) ($debit - $kredit),
+                        'created_by'     => $userId,
                         'created_at'  => now(),
                         'updated_at'  => now(),
                     ]);
@@ -344,6 +359,7 @@ public function storeSaldoAwal(Request $r)
                     'no_referensi'  => $noReferensi,
                     'keterangan'    => $ket,
                     'modul_sumber'  => 'Saldo Awal',
+                    'created_by' => $userId,
                     'created_at'    => now(),
                     'updated_at'    => now(),
                 ]);
@@ -363,6 +379,7 @@ public function storeSaldoAwal(Request $r)
                             'saldo_berjalan'  => (string) $saldoAkunAfter,
                             'tanggal'         => $tglStore, // ← dari request (Y-m-d)
                             'created_at'      => now(),
+                            'created_by'         => $userId,
                             'updated_at'      => now(),
                         ],
                         [
@@ -372,6 +389,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_kredit'      => (int)$amt,
                             'saldo_berjalan'  => (string) $saldoModalAfter,
                             'tanggal'         => $tglStore, // ← dari request (Y-m-d)
+                            'created_by'         => $userId,
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -386,6 +404,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_kredit'      => 0,
                             'saldo_berjalan'  => (string) $saldoModalAfter,
                             'tanggal'         => $tglStore, // ← dari request (Y-m-d)
+                            'created_by'         => $userId,
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -396,6 +415,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_kredit'      => (int)$amt,
                             'saldo_berjalan'  => (string) $saldoAkunAfter,
                             'tanggal'         => $tglStore, // ← dari request (Y-m-d)
+                            'created_by'         => $userId,
                             'created_at'      => now(),
                             'updated_at'      => now(),
                         ],
@@ -449,6 +469,7 @@ public function storetransaksi(Request $request)
     $ket      = $request->keterangan ?? null;
     $akunD    = $request->akun_debet_id;
     $akunK    = $request->akun_kredit_id;
+    $userId = $this->userId;
 
     DB::beginTransaction();
     try {
@@ -457,6 +478,7 @@ public function storetransaksi(Request $request)
         $jenisCode = 3; 
 
         $lastNo = DB::table('dat_transaksi')
+            ->where('created_by', $userId)
             ->where('no_transaksi', 'like', $prefix . '%')
             ->orderByDesc('id_transaksi')
             ->value('no_transaksi');
@@ -484,6 +506,7 @@ public function storetransaksi(Request $request)
             $noUtang= (string)$request->no_transaksi;
 
             $totalOutstanding = (int) DB::table('dat_utang')
+                ->where('created_by', $userId)
                 ->where('kode_pemasok', $kp)
                 ->where('no_transaksi', $noUtang)
                 ->where('status', 0)
@@ -513,6 +536,7 @@ public function storetransaksi(Request $request)
             $noPiutang   = (string)$request->no_transaksi;
 
             $totalOutstandingPiutang = (int)\DB::table('dat_piutang')
+                ->where('created_by', $userId)
                 ->where('id_pelanggan', $idPelanggan)
                 ->where('no_transaksi', $noPiutang)
                 ->where('status', 0)
@@ -545,6 +569,7 @@ public function storetransaksi(Request $request)
                 'no_referensi'  => $noTransaksi,
                 'keterangan'    => $ket,
                 'modul_sumber'  => 'Transaksi Kas/Bank',
+                'created_by'    => $userId,
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ]);
@@ -558,6 +583,7 @@ public function storetransaksi(Request $request)
                     'jml_debit'  => $nominal,
                     'jml_kredit' => 0,
                     'tanggal' => $tanggal,
+                    'created_by'    => $userId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ],
@@ -567,6 +593,7 @@ public function storetransaksi(Request $request)
                     'jml_debit'  => 0,
                     'jml_kredit' => $nominal,
                     'tanggal' => $tanggal,
+                    'created_by'    => $userId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ],
@@ -580,6 +607,7 @@ public function storetransaksi(Request $request)
                 // 'tipe_pembayaran'  => 1,
                 'total'            => $nominal,
                 // 'keterangan'       => $ket,
+                'created_by'       => $userId,
                 'created_at'       => now(),
                 'updated_at'       => now(),
             ]);
@@ -593,7 +621,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => $nominal,
                     'jml_kredit'     => 0,
-                    
+                    'created_by'       => $userId,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -604,7 +632,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => 0,
                     'jml_kredit'     => $nominal,
-                    
+                    'created_by'       => $userId,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -700,6 +728,7 @@ public function storetransaksi(Request $request)
             }
             if ($tipe === 'Bayar Utang Usaha') {
                 DB::table('dat_utang')
+                    ->where('created_by', $userId)
                     ->where('kode_pemasok', $kp)
                     ->where('no_transaksi', $noUtang)
                     ->where('status', 0)
@@ -710,6 +739,7 @@ public function storetransaksi(Request $request)
             }
             if ($tipe === 'Bayar Piutang Usaha') {
                 DB::table('dat_piutang')
+                ->where('created_by', $userId)
                 ->where('id_pelanggan', $idPelanggan)
                 ->where('no_transaksi', $noPiutang)
                 ->where('status', 0)
@@ -762,6 +792,7 @@ public function storetransaksi(Request $request)
                 'jenis_transaksi'  => $jenisCode,
                 'tipe_pembayaran'  => 1,
                 'total'            => $nominal,
+                'created_by'            => $userId,
                 // 'keterangan'       => $tipe,
                 'created_at'       => now(),
                 'updated_at'       => now(),
@@ -781,6 +812,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => $nominal,
                     'jml_kredit'     => 0,
+                    'created_by'            => $userId,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -791,6 +823,7 @@ public function storetransaksi(Request $request)
                     'jenis_laporan'  => 'null',
                     'jml_debit'      => 0,
                     'jml_kredit'     => $nominal,
+                    'created_by'            => $userId,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ],
@@ -875,11 +908,13 @@ public function storetransaksi(Request $request)
     bool $debetMengurangiSaldo = false
 ): void {
     // 1) Header jurnal (tetap)
+    $userId = $this->userId;
     $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
         'tgl_transaksi' => $tanggal,
         'no_referensi'  => $noReferensi,
         'keterangan'    => $keterangan,
         'modul_sumber'  => $modulSumber,
+        'created_by'  => $userId,
         'created_at'    => now(),
         'updated_at'    => now(),
     ]);
@@ -892,6 +927,7 @@ public function storetransaksi(Request $request)
         $akunKredit => ['debit' => 0,        'kredit' => $nominal],
     ] as $akunId => $val) {
         $bukbes = DB::table('dat_buku_besar')
+            ->where('created_by', $userId)
             ->where('id_akun', $akunId)
             ->where('periode', $periode)
             ->lockForUpdate()
@@ -899,6 +935,7 @@ public function storetransaksi(Request $request)
 
         if ($bukbes) {
             DB::table('dat_buku_besar')
+                ->where('created_by', $userId)
                 ->where('id_bukbes', $bukbes->id_bukbes)
                 ->update([
                     'ttl_debit'   => (float)$bukbes->ttl_debit + (float)$val['debit'],
@@ -913,6 +950,7 @@ public function storetransaksi(Request $request)
                 'ttl_debit'   => (float)$val['debit'],
                 'ttl_kredit'  => (float)$val['kredit'],
                 'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                'created_by'     => $userId,
                 'created_at'  => now(),
                 'updated_at'  => now(),
             ]);
@@ -960,6 +998,7 @@ public function storetransaksi(Request $request)
             'jenis_laporan'   => $jenisLaporanDebet,
             'saldo_berjalan'  => (string) $saldoDebetAfter,                   // [changes]
              'tanggal'    => $tanggal,
+             'created_by'    => $userId,
             'created_at'      => now(),
             'updated_at'      => now(),
         ],
@@ -973,6 +1012,7 @@ public function storetransaksi(Request $request)
             'jenis_laporan'   => $jenisLaporanKredit,
             'saldo_berjalan'  => (string) $saldoKreditAfter,                  // [changes]
              'tanggal'    => $tanggal,
+             'created_by'    => $userId,
             'created_at'      => now(),
             'updated_at'      => now(),
         ],
@@ -988,7 +1028,7 @@ public function storetransaksi(Request $request)
     $dateTo    = $request->get('date_to');   // 'YYYY-MM-DD'
     $page      = max(1, (int) $request->get('page', 1));
     $perPage   = max(1, min(100, (int) $request->get('per_page', 20)));
-
+    $userId    = $this->userId;
     $q = DB::table('dat_detail_jurnal as d')
         ->join('dat_header_jurnal as h', 'h.id_jurnal', '=', 'd.id_jurnal')
         ->join('mst_akun as a', 'a.id', '=', 'd.id_akun')
@@ -1001,7 +1041,10 @@ public function storetransaksi(Request $request)
             'd.jml_kredit as kredit',
             DB::raw("COALESCE(h.modul_sumber, 'Manual') as tipe"),
             'd.saldo_berjalan as saldo',
-        ]);
+        ])
+         ->where('a.created_by', $userId)  
+        ->where('h.created_by', $userId)  
+        ->where('d.created_by', $userId);
 
     // [changes] filter AKUN spesifik (prioritas id, fallback exact name)
     if (!empty($akunId)) {
@@ -1054,7 +1097,7 @@ public function storetransaksi(Request $request)
         $periode  = $request->get('periode'); 
         $page     = max(1, (int) $request->get('page', 1));
         $perPage  = max(1, min(100, (int) $request->get('per_page', 20)));
-
+        $userId   = $this->userId;
             $q = DB::table('dat_buku_besar as b')
             ->join('mst_akun as a', 'a.id', '=', 'b.id_akun')
             ->select([
@@ -1065,7 +1108,9 @@ public function storetransaksi(Request $request)
                 'b.ttl_kredit as kredit',
                 'a.saldo_berjalan as saldo',
                  DB::raw("'Manual' as tipe"),
-            ]);
+            ])
+            ->where('a.created_by', $userId)
+            ->where('b.created_by', $userId);;
 
         if ($search !== '') {
             $q->where(function($w) use ($search) {
@@ -1100,14 +1145,20 @@ public function storetransaksi(Request $request)
         'total'     => $total,
     ]);
 }
-      public function listPemasok()
+    public function listPemasok()
     {
+        $userId = $this->userId;
         $tp = (new PemasokModel)->getTable();     
         $tb = (new DatBarangModel)->getTable();   
+        $userId = $this->userId; 
 
         $items = PemasokModel::query()
             ->from("$tp as p")
-            ->leftJoin("$tb as b", 'b.kode_pemasok', '=', 'p.kode_pemasok')
+            ->leftJoin("$tb as b", function ($j) use ($userId) {  
+                $j->on('b.kode_pemasok', '=', 'p.kode_pemasok')
+                ->where('b.created_by', $userId);               
+            })
+            ->where('p.created_by', $userId)                       
             ->orderBy('p.kode_pemasok')
             ->get([
                 'p.id_pemasok',
@@ -1121,10 +1172,13 @@ public function storetransaksi(Request $request)
             'data' => $items,
         ]);
     }
+
          public function listPelanggan()
     {
-        $items = pelangganModel::orderBy('id_pelanggan')
-            ->get(['id_pelanggan','nama_pelanggan']);
+        $userId = $this->userId;
+         $items = pelangganModel::where('created_by', $userId) 
+        ->orderBy('id_pelanggan')
+        ->get(['id_pelanggan','nama_pelanggan']);
 
         return response()->json([
             'ok'   => true,

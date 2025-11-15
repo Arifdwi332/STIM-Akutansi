@@ -11,7 +11,7 @@ class DatDetailJurnal extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'id_jurnal','id_akun','jml_debit','jml_kredit','id_proyek','kode_pajak'
+        'id_jurnal','id_akun','jml_debit','jml_kredit','id_proyek','kode_pajak','created_by',
     ];
 
     public function header()

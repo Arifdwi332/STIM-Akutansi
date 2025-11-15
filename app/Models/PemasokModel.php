@@ -19,6 +19,7 @@ class PemasokModel extends Model
         'email',
         'npwp',
         'saldo_utang',
+        'created_by',
     ];
 
     protected $casts = [

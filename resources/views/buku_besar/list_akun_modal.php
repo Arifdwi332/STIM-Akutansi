@@ -68,40 +68,40 @@
 (function(){
   let dt = null;
 
-  function initDT(){
-    if (dt) return dt;
-    dt = $('#tblAkunFlat').DataTable({
-      processing: true,
-      serverSide: false,
-      paging: false,
-      info: false,
-      ordering: false,      // jaga urutan parent->sub
-      order: [],
-      dom: 't',             // <-- hilangkan search bawaan DT
-      ajax: {
-        url: "/buku_besar/list_akun_flat",
-        dataSrc: json => (json && json.data) ? json.data : []
-      },
-      columns: [
-        { data: 'kode' },
-        { data: 'nama_akun', render: (d, t, row) => row.is_sub ? '' : (d||'') },
-        { data: 'sub_akun', render: (d, t, row) => row.is_sub ? (d||'') : '' },
-        { data: 'kategori_akun', defaultContent: '-' },
-        { data: null, orderable:false, searchable:false, className:'text-center',
-          render: () => '<button type="button" class="btn btn-primary btn-sm" disabled>Edit</button>' }
-      ],
-      language: {
-        emptyTable:
-          `<div class="text-muted py-3">
-            <i class="far fa-folder-open fa-lg mb-1 d-block"></i>
-            Belum ada data akun.
-          </div>`
-      },
-      rowCallback: function(row, data){
-        if (data.is_sub) $(row).addClass('is-sub');
-        else $(row).removeClass('is-sub');
-      }
-    });
+  // function initDT(){
+  //   if (dt) return dt;
+  //   dt = $('#tblAkunFlat').DataTable({
+  //     processing: true,
+  //     serverSide: false,
+  //     paging: false,
+  //     info: false,
+  //     ordering: false,      // jaga urutan parent->sub
+  //     order: [],
+  //     dom: 't',             // <-- hilangkan search bawaan DT
+  //     ajax: {
+  //       url: "/buku_besar/list_akun_flat",
+  //       dataSrc: json => (json && json.data) ? json.data : []
+  //     },
+  //     columns: [
+  //       { data: 'kode' },
+  //       { data: 'nama_akun', render: (d, t, row) => row.is_sub ? '' : (d||'') },
+  //       { data: 'sub_akun', render: (d, t, row) => row.is_sub ? (d||'') : '' },
+  //       { data: 'kategori_akun', defaultContent: '-' },
+  //       { data: null, orderable:false, searchable:false, className:'text-center',
+  //         render: () => '<button type="button" class="btn btn-primary btn-sm" disabled>Edit</button>' }
+  //     ],
+  //     language: {
+  //       emptyTable:
+  //         `<div class="text-muted py-3">
+  //           <i class="far fa-folder-open fa-lg mb-1 d-block"></i>
+  //           Belum ada data akun.
+  //         </div>`
+  //     },
+  //     rowCallback: function(row, data){
+  //       if (data.is_sub) $(row).addClass('is-sub');
+  //       else $(row).removeClass('is-sub');
+  //     }
+  //   });
 
     $('#akunSearch').on('input', function(){ dt.search(this.value).draw(); });
     return dt;

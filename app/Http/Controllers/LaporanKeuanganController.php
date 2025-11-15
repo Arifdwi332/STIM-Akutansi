@@ -24,11 +24,13 @@ class LaporanKeuanganController extends Controller
     $q       = trim($request->input('search', ''));
     $page    = max(1, (int) $request->input('page', 1));
     $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+    $userId = $this->userId;
 
     // ===== Ambil data dari transaksi
     $trxRows = DB::table('dat_detail_transaksi as ddt')
         ->leftJoin('mst_akun as a1', 'a1.kode_akun', '=', 'ddt.kode_akun')
         ->where('ddt.jenis_laporan', 1)
+        ->where('a1.created_by', $userId)
         ->selectRaw("
             ddt.id_detail as id_row,
             'trx' as sumber,
@@ -53,6 +55,7 @@ class LaporanKeuanganController extends Controller
     $jurRows = DB::table('dat_detail_jurnal as ddj')
         ->leftJoin('mst_akun as a2', 'a2.id', '=', 'ddj.id_akun')
         ->where('ddj.jenis_laporan', 1)
+        ->where('a2.created_by', $userId)
         ->selectRaw("
             ddj.id_detail as id_row,
             'jur' as sumber,
@@ -131,10 +134,11 @@ class LaporanKeuanganController extends Controller
         $q       = trim($request->input('search', ''));
         $page    = max(1, (int) $request->input('page', 1));
         $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
-
-        // Ambil data langsung dari model
+        $userId = $this->userId;
+        
         $query = MstAkunModel::query()
             ->select('id', 'nama_akun', 'kategori_akun', 'saldo_berjalan', 'kode_akun')
+            ->where('created_by', $userId)
             ->when($q !== '', function ($w) use ($q) {
                 $like = '%'.$q.'%';
                 $w->where('nama_akun', 'like', $like)

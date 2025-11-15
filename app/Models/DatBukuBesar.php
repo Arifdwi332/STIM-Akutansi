@@ -11,7 +11,7 @@ class DatBukuBesar extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'id_akun','periode','ttl_debit','ttl_kredit','saldo_akhir'
+        'id_akun','periode','ttl_debit','ttl_kredit','saldo_akhir','created_by',
     ];
 
     public function akun()

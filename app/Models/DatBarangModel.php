@@ -20,6 +20,7 @@ class DatBarangModel extends Model
         'harga_jual',
         'stok_awal',
         'stok_akhir',
+        'created_by',
     ];
 
     protected $casts = [

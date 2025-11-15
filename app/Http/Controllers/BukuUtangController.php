@@ -31,7 +31,7 @@ class BukuUtangController extends Controller
         $page     = max(1, (int) $request->query('page', 1));
         $perPage  = max(1, min(100, (int) $request->query('per_page', 20)));
         $offset   = ($page - 1) * $perPage;
-
+        $userId   = $this->userId;
         $q = DB::table('dat_utang as u')
             ->leftJoin('dat_pemasok as ps', 'ps.kode_pemasok', '=', 'u.kode_pemasok')
             ->select([
@@ -44,6 +44,7 @@ class BukuUtangController extends Controller
                 'u.created_by',
                 'u.tanggal',
             ])
+            ->where('u.created_by', $userId)
             ->when($search !== '', function ($w) use ($search) {
                 $w->where(function ($x) use ($search) {
                     $x->where('u.kode_pemasok', 'like', "%{$search}%")
@@ -106,7 +107,7 @@ class BukuUtangController extends Controller
         $page     = max(1, (int) $request->query('page', 1));
         $perPage  = max(1, min(100, (int) $request->query('per_page', 20)));
         $offset   = ($page - 1) * $perPage;
-
+        $userId   = $this->userId;
         $q = DB::table('dat_piutang as p')
             ->leftJoin('dat_pelanggan as pl', 'pl.id_pelanggan', '=', 'p.id_pelanggan')
             ->select([
@@ -119,6 +120,7 @@ class BukuUtangController extends Controller
                 'p.created_by',
                 'p.tanggal',
             ])
+            ->where('p.created_by', $userId)
             ->when($search !== '', function ($w) use ($search) {
                 $w->where(function ($x) use ($search) {
                     $x->where('p.no_transaksi', 'like', "%{$search}%")
@@ -172,9 +174,10 @@ class BukuUtangController extends Controller
     public function refPemasok(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-
+        $userId = $this->userId;    
         $rows = DB::table('dat_pemasok')
             ->select('kode_pemasok', 'nama_pemasok')
+            ->where('created_by', $userId)
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function ($x) use ($q) {
                     $x->where('nama_pemasok', 'like', "%{$q}%")
@@ -196,9 +199,11 @@ class BukuUtangController extends Controller
     public function refPelanggan(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $userId = $this->userId;    
 
         $rows = DB::table('dat_pelanggan')
             ->select('id_pelanggan', 'nama_pelanggan')
+            ->where('created_by', $userId)
             ->when($q !== '', function ($w) use ($q) {
                 $w->where('nama_pelanggan', 'like', "%{$q}%");
             })

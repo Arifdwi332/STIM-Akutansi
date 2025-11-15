@@ -13,13 +13,14 @@ class MstAkunModel extends Model
     protected $table = 'mst_akun';
 
     // Primary key tabel
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_ai';
 
     // Aktifkan timestamps (created_at & updated_at)
     public $timestamps = true;
 
     // Kolom yang boleh diisi secara mass-assignment
     protected $fillable = [
+        'id',
         'kode_akun',
         'nama_akun',
         'kategori_akun',

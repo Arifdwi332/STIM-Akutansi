@@ -11,7 +11,7 @@ class DatHeaderJurnal extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'tgl_transaksi', 'no_referensi', 'keterangan', 'modul_sumber'
+        'tgl_transaksi', 'no_referensi', 'keterangan', 'modul_sumber','created_by',
     ];
 
     public function details()

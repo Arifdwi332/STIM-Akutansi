@@ -18,4 +18,5 @@ class PelangganModel extends Model
         'email',
         'npwp',
         'saldo_piutang',
+        'created_by',
     ];}

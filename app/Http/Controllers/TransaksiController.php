@@ -59,6 +59,7 @@ class TransaksiController extends Controller
             'email'          => $request->email,
             'npwp'           => $request->npwp,
             'saldo_piutang'  => 0,
+            'created_by'  => $this->userId,
         ]);
 
         return response()->json([
@@ -101,6 +102,7 @@ class TransaksiController extends Controller
             'email'        => $request->email,
             'npwp'         => $request->npwp,
             'saldo_utang'  => 0,
+            'created_by'  => $this->userId,
         ]);
 
         $barang = DatBarangModel::create([
@@ -111,6 +113,7 @@ class TransaksiController extends Controller
             'harga_jual'   => $request->harga_jual,
             'stok_awal'    => 0,
             'stok_akhir'   => 0,
+            'created_by'  => $this->userId,
         ]);
 // dd($barang);    
         return response()->json([
@@ -174,22 +177,39 @@ class TransaksiController extends Controller
 
 
 
-   public function getParties(Request $request)
-    {
-        $tipe = $request->query('tipe');  
-        if ($tipe === 'Inventaris') {
-            $rows = PemasokModel::orderBy('nama_pemasok')
-                    ->get(['id_pemasok as id', 'nama_pemasok as nama', 'kode_pemasok']);
-        } else {
-            $rows = PelangganModel::orderBy('nama_pelanggan')
-                    ->get(['id_pelanggan as id', 'nama_pelanggan as nama']);
-        }
-        return response()->json(['ok' => true, 'data' => $rows]);
+public function getParties(Request $request)
+{
+    $tipe   = $request->query('tipe');  
+    $userId = $this->userId; 
+
+    if ($tipe === 'Inventaris') {
+        $rows = PemasokModel::where('created_by', $userId)   
+                ->orderBy('nama_pemasok')
+                ->get([
+                    'id_pemasok as id',
+                    'nama_pemasok as nama',
+                    'kode_pemasok'
+                ]);
+    } else {
+        $rows = PelangganModel::where('created_by', $userId) 
+                ->orderBy('nama_pelanggan')
+                ->get([
+                    'id_pelanggan as id',
+                    'nama_pelanggan as nama'
+                ]);
     }
+
+    return response()->json([
+        'ok'   => true,
+        'data' => $rows
+    ]);
+}
+
    public function barangList()
     {
         $rows = DatBarangModel::query()
             ->select('id_barang as id','nama_barang as nama','satuan_ukur','harga_jual','hpp','harga_satuan')
+            ->where('created_by', $this->userId)
             ->orderBy('nama_barang')
             ->get();
 
@@ -555,18 +575,31 @@ public function store(Request $request)
     // Nomor Transaksi
     // ============================
     $noTransaksi = trim((string) $request->no_transaksi);
-
-    if ($request->tipe === 'Inventaris') {
+    $userId = $this->userId;
+   if ($request->tipe === 'Inventaris') {
         if ($noTransaksi === '') {
-            return response()->json(['ok' => false, 'message' => 'No transaksi wajib diisi untuk pembelian'], 422);
+            return response()->json([
+                'ok'      => false,
+                'message' => 'No transaksi wajib diisi untuk pembelian'
+            ], 422);
         }
-        if (DB::table('dat_transaksi')->where('no_transaksi', $noTransaksi)->exists()) {
-            return response()->json(['ok' => false, 'message' => 'No transaksi sudah digunakan'], 422);
+
+        $exists = DB::table('dat_transaksi')
+            ->where('created_by', $userId)   // [CHANGED]
+            ->where('no_transaksi', $noTransaksi)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'ok'      => false,
+                'message' => 'No transaksi sudah digunakan'
+            ], 422);
         }
     } else {
         $valid = preg_match('/^P\d{7}$/', $noTransaksi);
         if (!$valid) {
             $lastNo = DB::table('dat_transaksi')
+                ->where('created_by', $userId)
                 ->where('no_transaksi', 'like', 'P%')
                 ->orderByDesc('id_transaksi')
                 ->value('no_transaksi');
@@ -593,9 +626,11 @@ public function store(Request $request)
         foreach ($items->values() as $idx => $it) {
             $isLast = ($idx === $items->count() - 1);
 
-            $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])
-                ->lockForUpdate()
-                ->first();
+           $barang = DatBarangModel::where('id_barang', (int) $it['barang_id'])
+            ->where('created_by', $this->userId)
+            ->lockForUpdate()
+            ->first();
+
 
             if (!$barang) {
                 throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
@@ -638,6 +673,7 @@ public function store(Request $request)
                 'total'             => $totalItem,
                 'biaya_lain'        => (float) $biayaLain,
                 'diskon'            => (float) $diskonNominal,
+                'created_by'        => $userId,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ];
@@ -740,7 +776,7 @@ public function store(Request $request)
         // Tambah saldo berjalan akun 17 (sesuai aturan kamu)
         if (!empty($tambahAkun17)) {
             DB::table('mst_akun')
-                ->where('id', 17)
+                ->where('id', 17)     
                 ->lockForUpdate()
                 ->increment('saldo_berjalan', (float) $grandTotal);
         }
@@ -749,6 +785,7 @@ public function store(Request $request)
          if ($hppRow > 0) {
              DB::table('mst_akun')
             ->where('id', 17)
+            ->where('created_by', $userId)
             ->lockForUpdate()
             ->decrement('saldo_berjalan', $hppRow);
          }
@@ -759,6 +796,7 @@ public function store(Request $request)
             if (!$kodePemasok && $idKontak) {
                 $kodePemasok = DB::table('dat_pemasok')
                     ->where('id_pemasok', $idKontak)
+                    ->where('created_by', $userId)
                     ->value('kode_pemasok');
             }
 
@@ -766,7 +804,7 @@ public function store(Request $request)
                 'kode_pemasok' => (string) ($kodePemasok ?? ''),
                 'no_transaksi' => $noTransaksi,
                 'nominal'      => (float) $grandTotal,
-                'created_by'   => (int) (auth()->id() ?? 0),
+                'created_by'   => $userId,
                 'tanggal'      => $tglSql,
                 'status'       => 0,
             ]);
@@ -781,7 +819,7 @@ public function store(Request $request)
                 'no_transaksi' => $noTransaksi,
                 'nominal'      => (float) $grandTotal,
                 'status'       => 0, // Belum Lunas
-                'created_by'   => (int) (auth()->id() ?? 0),
+                'created_by'   => $userId,
                 'tanggal'      => $tglSql,
             ]);
         }
@@ -918,7 +956,7 @@ public function datatableTransaksi(Request $r) // [CHANGES] terima Request
     $tglAwal = $r->query('tgl_awal');
     $tglAkhir = $r->query('tgl_akhir');
     $tipeParam = $r->query('tipe'); // contoh: "Penjualan" / "Inventaris" / 1 / 2
-
+    $userId = $this->userId;
     // [CHANGES] Map tipeParam -> jenis_transaksi (1=Penjualan, 2=Inventaris)
     $jenisFilter = null;
     if ($tipeParam !== null && $tipeParam !== '') {
@@ -942,7 +980,8 @@ public function datatableTransaksi(Request $r) // [CHANGES] terima Request
             DB::raw('SUM(t.jml_barang) as qty'),
             DB::raw('SUM(t.total) as total')
         )
-        ->whereIn('t.jenis_transaksi', [1, 2]);
+        ->whereIn('t.jenis_transaksi', [1, 2])
+        ->where('t.created_by', $userId);;
 
     // [CHANGES] Terapkan filter tanggal (inklusif)
     if (!empty($tglAwal)) {
@@ -961,14 +1000,17 @@ public function datatableTransaksi(Request $r) // [CHANGES] terima Request
     $agg = $base->groupBy('t.no_transaksi');
 
     $x = DB::query()->fromSub($agg, 'x')
-        ->leftJoin('dat_pelanggan as pl', function($j){
+        ->leftJoin('dat_pelanggan as pl', function($j) use ($userId){
             $j->on('pl.id_pelanggan', '=', 'x.id_kontak')
-              ->where('x.jenis_transaksi', '=', 1);
+              ->where('x.jenis_transaksi', '=', 1)
+              ->where('pl.created_by', $userId);;
         })
-        ->leftJoin('dat_pemasok as ps', function($j){
+       ->leftJoin('dat_pemasok as ps', function($j) use ($userId) {
             $j->on('ps.id_pemasok', '=', 'x.id_kontak')
-              ->where('x.jenis_transaksi', '=', 2);
+            ->where('x.jenis_transaksi', 2)
+            ->where('ps.created_by', $userId);
         })
+
         ->select([
             'x.no_transaksi',
             'x.tgl',
@@ -980,6 +1022,7 @@ public function datatableTransaksi(Request $r) // [CHANGES] terima Request
                       FROM dat_transaksi t2 
                       JOIN dat_barang b ON b.id_barang = t2.id_barang
                       WHERE t2.no_transaksi = x.no_transaksi
+                      AND t2.created_by = {$userId}
                       ORDER BY t2.id_transaksi ASC
                       LIMIT 1) as deskripsi")
         ])
@@ -1003,36 +1046,45 @@ public function datatableTransaksi(Request $r) // [CHANGES] terima Request
 }
 public function datatableInventaris()
 {
+    // [CHANGED] ambil user id
+    $userId = $this->userId;
+
     $rows = DatBarangModel::query()
-        ->leftJoin('dat_pemasok as ps', 'ps.kode_pemasok', '=', 'dat_barang.kode_pemasok')
+        // [CHANGED] join pemasok juga dibatasi created_by
+        ->leftJoin('dat_pemasok as ps', function ($j) use ($userId) {
+            $j->on('ps.kode_pemasok', '=', 'dat_barang.kode_pemasok')
+              ->where('ps.created_by', $userId);
+        })
         ->select([
             'dat_barang.id_barang',
             'dat_barang.nama_barang',
             'ps.nama_pemasok',
-            'dat_barang.stok_akhir',       
+            'dat_barang.stok_akhir',
             'dat_barang.satuan_ukur',
             'dat_barang.harga_satuan',
-            'dat_barang.harga_jual',   
+            'dat_barang.harga_jual',
             'dat_barang.created_at',
-            'dat_barang.updated_at',  
+            'dat_barang.updated_at',
         ])
+        // [CHANGED] hanya barang milik user ini
+        ->where('dat_barang.created_by', $userId)
         ->orderBy('dat_barang.updated_at', 'desc')
         ->get()
-        ->map(function($r){
+        ->map(function ($r) {
             return [
                 'id_barang'     => $r->id_barang,
                 'nama_barang'   => $r->nama_barang ?: '-',
                 'pemasok'       => $r->nama_pemasok ?: '-',
                 'stok'          => (float) $r->stok_akhir,
                 'satuan'        => $r->satuan_ukur ?: '-',
-                'harga_satuan'  => (float) $r->harga_satuan,  
-                'total'         => (float) $r->harga_jual,  
+                'harga_satuan'  => (float) $r->harga_satuan,
+                'total'         => (float) $r->harga_jual,
 
-                'created_at'    => $r->created_at 
-                                    ? $r->created_at->format('d/m/Y H:i') 
+                'created_at'    => $r->created_at
+                                    ? $r->created_at->format('d/m/Y H:i')
                                     : null,
-                'updated_at'    => $r->updated_at 
-                                    ? $r->updated_at->format('d/m/Y H:i') 
+                'updated_at'    => $r->updated_at
+                                    ? $r->updated_at->format('d/m/Y H:i')
                                     : null,
             ];
         });
@@ -1064,7 +1116,9 @@ public function getBarangByPemasok(Request $request)
 
 public function getBarangSemua(Request $request)
 {
-    $barang = DatBarangModel::orderBy('nama_barang')->get();
+    $barang = DatBarangModel::orderBy('nama_barang')
+     ->where('created_by', $this->userId)
+     ->get();
 
     return response()->json([
         'ok'   => true,

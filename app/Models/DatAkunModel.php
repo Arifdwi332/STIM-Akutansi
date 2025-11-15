@@ -20,6 +20,7 @@ class DatAkunModel extends Model
         'saldo_awal',
         'saldo_berjalan',
         'status_aktif',
+        'created_by',
     ];
 
     protected $casts = [
