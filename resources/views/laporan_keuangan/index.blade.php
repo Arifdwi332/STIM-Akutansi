@@ -317,8 +317,12 @@
                                 const namaAkun = r.nama_akun ?? '';
                                 let saldo = Number(r.saldo ?? 0);
 
-                                // khusus LIABILITAS → selalu positif
-                                if (key === "liabilitas") {
+                                // [change] ambil id akun (sesuaikan dengan field dari API-mu)
+                                const akunId = r.id_akun ?? r.id ?? null;
+
+                                // [change] khusus LIABILITAS → selalu positif,
+                                // kecuali akun Utang PPN (id = 72) yang pakai saldo asli
+                                if (key === "liabilitas" && akunId !== 72) {
                                     saldo = Math.abs(saldo);
                                 }
 

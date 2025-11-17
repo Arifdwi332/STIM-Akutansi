@@ -822,6 +822,56 @@ public function store(Request $request)
             );
         }
       
+      } elseif ($jenisCode === 2) {
+
+            $akunPersediaan   = 6;          // Persediaan / Inventaris
+            $akunPpnPembelian = 72;         // Akun utang PPN yang akan DIKURANGI
+            $akunKasAtauUtang = ($tipePembayaran === 1) ? 1 : 5;   // 1=Kas, 5=Utang Usaha
+            $kreditKasAtauUtang = ($tipePembayaran === 2);         // kredit menambah saldo hanya untuk utang
+
+            // 1) Persediaan dari SUBTOTAL (tanpa PPN)
+            if ($subtotal > 0) {
+                $this->insertJurnalSimple(
+                    $tglSql,
+                    (float) $subtotal,
+                    $keterangan,
+                    $akunPersediaan,          // Debet Persediaan
+                    $akunKasAtauUtang,        // Kredit Kas / Utang Usaha
+                    2,                        // Neraca
+                    2,
+                    $noTransaksi,
+                    $request->tipe,
+                    $kreditKasAtauUtang
+                );
+            }
+
+            // 2) PPN Pembelian:
+            //    Debet akun utang PPN (72) → saldo utang PPN berkurang
+            //    Kredit kas/utang → pembayaran PPN-nya
+            if ($pajakNominal > 0) {
+                $this->insertJurnalSimple(
+                    $tglSql,
+                    (float) $pajakNominal,
+                    'PPN pembelian ' . $noTransaksi,
+                    $akunPpnPembelian,        // Debet Utang PPN (mengurangi utang)
+                    $akunKasAtauUtang,        // Kredit Kas / Utang Usaha
+                    2,
+                    2,
+                    $noTransaksi,
+                    'PPN_BELI',
+                    $kreditKasAtauUtang
+                );
+            }
+
+            // Catatan:
+            // - Di sini diskon pembelian & biaya_lain BELUM dipisah ke akun khusus.
+            //   Nilainya tetap mempengaruhi grandTotal & dat_utang.
+            //   Kalau nanti mau dipetakan ke akun tertentu (mis. Potongan Pembelian,
+            //   Beban Pengiriman, dll), kita bisa tambah jurnal lagi di sini.
+
+        // ============================
+        // Fallback: PENJUALAN TUNAI / kasus lain sederhana
+        // ============================
         } else {
             $this->insertJurnalSimple(
                 $tglSql,
@@ -862,7 +912,7 @@ public function store(Request $request)
         }
 
         
-         if ($hppRow > 0) {
+         if ($tambahAkun17 > 0) {
              DB::table('mst_akun')
             ->where('id', 17)
             ->where('created_by', $userId)
@@ -958,7 +1008,9 @@ private function insertJurnalSimple(
         $currKredit = (float)($akunRows[$akunKredit]->saldo_berjalan ?? 0);
 
         $saldoDebetAfter  = $currDebet + $nominal;
-
+        if ($akunDebet === 72) {
+            $saldoDebetAfter = $currDebet - $nominal;
+        }
        
         if ($akunKredit === 20) {         
             $kreditMenambahSaldo = false;  
