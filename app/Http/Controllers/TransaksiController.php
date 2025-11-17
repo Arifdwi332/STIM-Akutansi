@@ -753,92 +753,75 @@ public function store(Request $request)
         //  - Pendapatan Penjualan (15) pakai SUBTOTAL
         //  - Piutang Usaha (20) pakai GRANDTOTAL
         // ============================
-        if ($jenisCode === 1 && $tipePembayaran === 2) {   // [change] penjualan non-tunai
+       if ($jenisCode === 1 && $tipePembayaran === 2) {
+    $akunPendapatanPenjualan = 15; // 4101
+    $akunPiutangUsaha        = 20; // 1103
+    $akunDiskonPenjualan     = 62; // 6205
+    $akunPpnKeluaran         = 52; // 4511
+    $akunPendapatanLain      = 50; // 4102
 
-            $akunPendapatanPenjualan = 15; // 4101 Pendapatan Penjualan
-            $akunPiutangUsaha        = 20; // 1103 Piutang Usaha
-            $akunDiskonPenjualan     = 62; // 6205 Beban Diskon Penjualan  (sesuaikan)
-            $akunPpnKeluaran         = 52; // 4511 PPN Keluaran            (sesuaikan)
-            $akunPendapatanLain      = 50; // 4102 Pendapatan lain-lain    (sesuaikan)
+    // 1) Penjualan barang
+    $this->insertJurnalSimple(
+        $tglSql,
+        (float) $subtotal,
+        $keterangan,
+        $akunPiutangUsaha,        
+        $akunPendapatanPenjualan,
+        2,
+        1,
+        $noTransaksi,
+        $request->tipe,
+        false
+    );
 
-            // 1) Jurnal utama penjualan barang
-            //    Debit  : Piutang (20) = SUBTOTAL
-            //    Kredit : Pendapatan (15) = SUBTOTAL
+        // 2) Diskon penjualan
+        if ($diskonNominal > 0) {
             $this->insertJurnalSimple(
                 $tglSql,
-                (float) $subtotal,
-                $keterangan,
-                $akunPiutangUsaha,         // [change] Debet Piutang
-                $akunPendapatanPenjualan,  // [change] Kredit Pendapatan
-                2,                         // [change] Piutang → Neraca
-                1,                         // Pendapatan → Laba Rugi
+                (float) $diskonNominal,
+                'Diskon penjualan ' . $noTransaksi,
+                $akunDiskonPenjualan,
+                $akunPiutangUsaha,
+                1,
+                2,
                 $noTransaksi,
-                $request->tipe,
-                false                      // [change] Piutang: kredit tidak menambah saldo
+                'DISKON',
+                false
             );
+        }
 
-            // 2) Diskon penjualan (kalau ada)
-            //    Supaya Piutang turun dari subtotal → afterDisc
-            //    Debit  : Beban Diskon (62) = diskonNominal
-            //    Kredit : Piutang (20)      = diskonNominal
-            if ($diskonNominal > 0) {     // [change]
-                $this->insertJurnalSimple(
-                    $tglSql,
-                    (float) $diskonNominal,
-                    'Diskon penjualan ' . $noTransaksi,
-                    $akunDiskonPenjualan,   // [change] Debet Beban Diskon
-                    $akunPiutangUsaha,      // [change] Kredit Piutang
-                    1,                      // Beban → Laba Rugi
-                    2,                      // Piutang → Neraca
-                    $noTransaksi,
-                    'DISKON',
-                    false
-                );
-            }
+        // 3) PPN keluaran
+        if ($pajakNominal > 0) {
+            $this->insertJurnalSimple(
+                $tglSql,
+                (float) $pajakNominal,
+                'PPN keluaran ' . $noTransaksi,
+                $akunPiutangUsaha,
+                $akunPpnKeluaran,
+                2,
+                2,
+                $noTransaksi,
+                'PPN',
+                false
+            );
+        }
 
-            // 3) PPN keluaran (kalau ada)
-            //    Menambah Piutang sesuai pajak
-            //    Debit  : Piutang (20)   = pajakNominal
-            //    Kredit : PPN Keluaran   = pajakNominal
-            if ($pajakNominal > 0) {      // [change]
-                $this->insertJurnalSimple(
-                    $tglSql,
-                    (float) $pajakNominal,
-                    'PPN keluaran ' . $noTransaksi,
-                    $akunPiutangUsaha,      // [change] Debet Piutang
-                    $akunPpnKeluaran,       // [change] Kredit PPN
-                    2,                      // Piutang → Neraca
-                    2,                      // PPN → Neraca
-                    $noTransaksi,
-                    'PPN',
-                    false
-                );
-            }
-
-            // 4) Biaya lain yang DITAGIHKAN ke customer (kalau ada)
-            //    Supaya Piutang bertambah lagi sampai GRANDTOTAL
-            //    Debit  : Piutang (20)          = biayaLain
-            //    Kredit : Pendapatan lain (50)  = biayaLain
-            if ($biayaLain > 0) {         // [change]
-                $this->insertJurnalSimple(
-                    $tglSql,
-                    (float) $biayaLain,
-                    'Biaya lain penjualan ' . $noTransaksi,
-                    $akunPiutangUsaha,      
-                    $akunPendapatanLain,    
-                    2,                      // Piutang → Neraca
-                    1,                      // Pendapatan lain → Laba Rugi
-                    $noTransaksi,
-                    'BIAYA_LAIN',
-                    false
-                );
-            }
-
-            // [change] Sampai di sini:
-            // - Total Kredit akun 15 (Pendapatan)  = SUBTOTAL
-            // - Total Debet akun 20 (Piutang)      = GRANDTOTAL
-            //   (subtotal - diskon + pajak + biayaLain)
-
+        // 4) Biaya lain yang ikut ditagih
+        if ($biayaLain > 0) {
+            $this->insertJurnalSimple(
+                $tglSql,
+                (float) $biayaLain,
+                'Biaya lain penjualan ' . $noTransaksi,
+                $akunPiutangUsaha,
+                $akunPendapatanLain,
+                2,
+                1,
+                $noTransaksi,
+                'BIAYA_LAIN',
+                false
+            );
+        }
+      
         } else {
             $this->insertJurnalSimple(
                 $tglSql,
@@ -910,7 +893,7 @@ public function store(Request $request)
         // Penjualan Kredit → Piutang
         if ($jenisCode === 1 && $tipePembayaran === 2) {
             $idPelanggan = (int) ($request->input('pelanggan_id') ?? $idKontak ?? 0);
-
+// dd($grandTotal);
             DB::table('dat_piutang')->insert([
                 'id_pelanggan' => $idPelanggan,
                 'no_transaksi' => $noTransaksi,
@@ -950,6 +933,11 @@ private function insertJurnalSimple(
     bool $kreditMenambahSaldo = false
 ): void {
 
+    $nominal = (float) $nominal;
+    if ($nominal <= 0) {
+        return;
+    }
+
     DB::transaction(function () use (
         $tanggal, $nominal, $keterangan, $akunDebet, $akunKredit,
         $jenisLaporanDebet, $jenisLaporanKredit, $noReferensi,
@@ -957,8 +945,10 @@ private function insertJurnalSimple(
     ) {
         $now     = now();
         $periode = Carbon::parse($tanggal)->format('Y-m');
+        $userId  = $this->userId; 
 
         $akunRows = DB::table('mst_akun')
+            ->where('created_by', $userId)          
             ->whereIn('id', [$akunDebet, $akunKredit])
             ->lockForUpdate()
             ->get(['id','saldo_berjalan'])
@@ -968,14 +958,22 @@ private function insertJurnalSimple(
         $currKredit = (float)($akunRows[$akunKredit]->saldo_berjalan ?? 0);
 
         $saldoDebetAfter  = $currDebet + $nominal;
-        // [note] Jika $kreditMenambahSaldo=true → saldo kredit ditambah; jika tidak → dikurang
-        $saldoKreditAfter = $kreditMenambahSaldo ? ($currKredit + $nominal) : ($currKredit - $nominal);
 
+       
+        if ($akunKredit === 20) {         
+            $kreditMenambahSaldo = false;  
+        }
+
+        $saldoKreditAfter = $kreditMenambahSaldo
+            ? ($currKredit + $nominal)
+            : ($currKredit - $nominal);
+        $userId = $this->userId;
         $idJurnal = DB::table('dat_header_jurnal')->insertGetId([
             'tgl_transaksi' => $tanggal,
             'no_referensi'  => $noReferensi,
             'keterangan'    => $keterangan,
             'modul_sumber'  => $modulSumber,
+            'created_by'    => $userId,
             'created_at'    => $now,
             'updated_at'    => $now,
         ]);
@@ -989,6 +987,7 @@ private function insertJurnalSimple(
                 'jenis_laporan'  => $jenisLaporanDebet,
                 'saldo_berjalan' => $saldoDebetAfter,
                 'tanggal'        => $tanggal,
+                'created_by'    => $userId,
                 'created_at'     => $now,
                 'updated_at'     => $now,
             ],
@@ -1000,6 +999,7 @@ private function insertJurnalSimple(
                 'jenis_laporan'  => $jenisLaporanKredit,
                 'saldo_berjalan' => $saldoKreditAfter,
                 'tanggal'        => $tanggal,
+                'created_by'    => $userId,
                 'created_at'     => $now,
                 'updated_at'     => $now,
             ],
@@ -1022,6 +1022,8 @@ private function insertJurnalSimple(
                         'ttl_debit'   => (float)$bukbes->ttl_debit  + (float)$val['debit'],
                         'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
                         'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
+                        'created_by'    => $userId,
+                        'created_at'    => $now,
                         'updated_at'  => $now,
                     ]);
             } else {
@@ -1031,6 +1033,7 @@ private function insertJurnalSimple(
                     'ttl_debit'   => (float)$val['debit'],
                     'ttl_kredit'  => (float)$val['kredit'],
                     'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                    'created_by'    => $userId,
                     'created_at'  => $now,
                     'updated_at'  => $now,
                 ]);
@@ -1039,10 +1042,12 @@ private function insertJurnalSimple(
 
         DB::table('mst_akun')
             ->where('id', $akunDebet)
+            ->where('created_by', $userId)
             ->update(['saldo_berjalan' => $saldoDebetAfter, 'updated_at' => $now]);
 
         DB::table('mst_akun')
             ->where('id', $akunKredit)
+            ->where('created_by', $userId)
             ->update(['saldo_berjalan' => $saldoKreditAfter, 'updated_at' => $now]);
     });
 }
