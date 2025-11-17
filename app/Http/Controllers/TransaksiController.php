@@ -754,11 +754,11 @@ public function store(Request $request)
         //  - Piutang Usaha (20) pakai GRANDTOTAL
         // ============================
        if ($jenisCode === 1 && $tipePembayaran === 2) {
-    $akunPendapatanPenjualan = 15; // 4101
-    $akunPiutangUsaha        = 20; // 1103
-    $akunDiskonPenjualan     = 62; // 6205
-    $akunPpnKeluaran         = 52; // 4511
-    $akunPendapatanLain      = 50; // 4102
+        $akunPendapatanPenjualan = 15; // 4101
+        $akunPiutangUsaha        = 20; // 1103
+        $akunDiskonPenjualan     = 62; // 6205
+        $akunPpnKeluaran         = 72; // 4511
+        $akunPendapatanLain      = 50; // 4102
 
     // 1) Penjualan barang
     $this->insertJurnalSimple(
@@ -802,7 +802,7 @@ public function store(Request $request)
                 2,
                 $noTransaksi,
                 'PPN',
-                false
+                true
             );
         }
 
