@@ -82,7 +82,10 @@ class AuthController extends Controller
             'user_email' => $user->email,
         ]);
 
+        $request->session()->regenerate();
+
         return redirect()->to('/'); 
     }
+
 
 }

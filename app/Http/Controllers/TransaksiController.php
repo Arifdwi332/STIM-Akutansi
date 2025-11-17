@@ -566,7 +566,6 @@ public function store(Request $request)
     $afterDisc    = $subtotal - $diskonNominal;
     $pajakNominal = $applyPajak ? (float) round($afterDisc * ($pajakPersen / 100)) : 0.0;
     $grandTotal   = max(0, $afterDisc + $pajakNominal + $biayaLain);
-
     $idKontak  = $request->input('party_id', $request->input('pelanggan_id'));
     $jenisCode = $request->tipe === 'Penjualan' ? 1 : 2; // 1=Penjualan, 2=Inventaris
     $prefix    = $jenisCode === 1 ? 'P' : 'S';
@@ -649,6 +648,7 @@ public function store(Request $request)
             }
 
             $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
+            $totalHarga = (int) ($afterDiscItem  + $biayaItem);
             $hargaMentahSrc = $hargaSatuan;
             $hppRow = (float) round($hargaMentahSrc * (float) $it['qty']);
             $totalHppMentah += $hppRow;  
@@ -699,37 +699,42 @@ public function store(Request $request)
         // ============================
         // Insert ke Jurnal & Buku Besar
         // ============================
+               // ============================
+        // Insert ke Jurnal & Buku Besar
+        // ============================
         $keterangan = $request->tipe === 'Penjualan' ? 'Penjualan Barang' : 'Pembelian Inventaris';
 
         if ($jenisCode === 1) {
             // PENJUALAN
             if ($tipePembayaran === 1) {
-                $akunDebet      = 1;   // Kas
-                $akunKredit     = 15;  // Pendapatan Penjualan
-                $tambahAkun17   = true;
+                $akunDebet    = 1;   // Kas
+                $akunKredit   = 15;  // Pendapatan Penjualan
+                $tambahAkun17 = true;
             } else {
-                $akunDebet      = 20;  // Piutang Usaha
-                $akunKredit     = 15;  // Pendapatan Penjualan
-                $tambahAkun17   = true;
+                $akunDebet    = 20;  // Piutang Usaha
+                $akunKredit   = 15;  // Pendapatan Penjualan
+                $tambahAkun17 = true;
             }
         } else {
             // PEMBELIAN (INVENTARIS)
             if ($tipePembayaran === 1) {
-                $akunDebet      = 6;   // Persediaan / Inventaris
-                $akunKredit     = 1;   // Kas
-                $tambahAkun17   = false;
+                $akunDebet    = 6;   // Persediaan / Inventaris
+                $akunKredit   = 1;   // Kas
+                $tambahAkun17 = false;
             } else {
-                $akunDebet      = 6;   // Persediaan / Inventaris
-                $akunKredit     = 5;   // Utang Usaha
-                $tambahAkun17   = false;
+                $akunDebet    = 6;   // Persediaan / Inventaris
+                $akunKredit   = 5;   // Utang Usaha
+                $tambahAkun17 = false;
             }
         }
 
         // Pengaruh saldo kredit (khusus pembelian kredit → utang bertambah)
         $kreditMenambahSaldo = ($jenisCode === 2 && $tipePembayaran === 2);
 
-        // Nominal jurnal (aturan kamu): Penjualan → subtotal, Pembelian → grandTotal
-        $nominalJurnal = ($jenisCode === 1) ? (float) ($subtotal ?? 0) : (float) ($grandTotal ?? 0);
+        // Nominal jurnal default: Penjualan → subtotal, Pembelian → grandTotal
+        $nominalJurnal = ($jenisCode === 1)
+            ? (float) ($subtotal ?? 0)
+            : (float) ($grandTotal ?? 0);
 
         // ============================
         // Jenis Laporan (Detail Jurnal)
@@ -738,24 +743,116 @@ public function store(Request $request)
         $jenisLaporanDebet  = $jenisCode;
         $jenisLaporanKredit = 1;
 
-        // [change] Override: Penjualan Kredit → DEBET (Piutang) harus Neraca (2)
+        // [change] Override lama (masih boleh kalau dipakai di mode single-jurnal)
         if ($jenisCode === 1 && $tipePembayaran === 2) {
-            $jenisLaporanDebet = 2;
+            $jenisLaporanDebet = 2; // Piutang → Neraca
         }
 
-        // Jurnal utama
-        $this->insertJurnalSimple(
-            $tglSql,
-            $nominalJurnal,
-            $keterangan,
-            $akunDebet,
-            $akunKredit,
-            $jenisLaporanDebet,   // [change] bisa 2 bila penjualan kredit
-            $jenisLaporanKredit,  // tetap 1 (Pendapatan)
-            $noTransaksi,
-            $request->tipe,
-            $kreditMenambahSaldo
-        );
+        // ============================
+        // [change] KHUSUS PENJUALAN KREDIT:
+        //  - Pendapatan Penjualan (15) pakai SUBTOTAL
+        //  - Piutang Usaha (20) pakai GRANDTOTAL
+        // ============================
+        if ($jenisCode === 1 && $tipePembayaran === 2) {   // [change] penjualan non-tunai
+
+            $akunPendapatanPenjualan = 15; // 4101 Pendapatan Penjualan
+            $akunPiutangUsaha        = 20; // 1103 Piutang Usaha
+            $akunDiskonPenjualan     = 62; // 6205 Beban Diskon Penjualan  (sesuaikan)
+            $akunPpnKeluaran         = 52; // 4511 PPN Keluaran            (sesuaikan)
+            $akunPendapatanLain      = 50; // 4102 Pendapatan lain-lain    (sesuaikan)
+
+            // 1) Jurnal utama penjualan barang
+            //    Debit  : Piutang (20) = SUBTOTAL
+            //    Kredit : Pendapatan (15) = SUBTOTAL
+            $this->insertJurnalSimple(
+                $tglSql,
+                (float) $subtotal,
+                $keterangan,
+                $akunPiutangUsaha,         // [change] Debet Piutang
+                $akunPendapatanPenjualan,  // [change] Kredit Pendapatan
+                2,                         // [change] Piutang → Neraca
+                1,                         // Pendapatan → Laba Rugi
+                $noTransaksi,
+                $request->tipe,
+                false                      // [change] Piutang: kredit tidak menambah saldo
+            );
+
+            // 2) Diskon penjualan (kalau ada)
+            //    Supaya Piutang turun dari subtotal → afterDisc
+            //    Debit  : Beban Diskon (62) = diskonNominal
+            //    Kredit : Piutang (20)      = diskonNominal
+            if ($diskonNominal > 0) {     // [change]
+                $this->insertJurnalSimple(
+                    $tglSql,
+                    (float) $diskonNominal,
+                    'Diskon penjualan ' . $noTransaksi,
+                    $akunDiskonPenjualan,   // [change] Debet Beban Diskon
+                    $akunPiutangUsaha,      // [change] Kredit Piutang
+                    1,                      // Beban → Laba Rugi
+                    2,                      // Piutang → Neraca
+                    $noTransaksi,
+                    'DISKON',
+                    false
+                );
+            }
+
+            // 3) PPN keluaran (kalau ada)
+            //    Menambah Piutang sesuai pajak
+            //    Debit  : Piutang (20)   = pajakNominal
+            //    Kredit : PPN Keluaran   = pajakNominal
+            if ($pajakNominal > 0) {      // [change]
+                $this->insertJurnalSimple(
+                    $tglSql,
+                    (float) $pajakNominal,
+                    'PPN keluaran ' . $noTransaksi,
+                    $akunPiutangUsaha,      // [change] Debet Piutang
+                    $akunPpnKeluaran,       // [change] Kredit PPN
+                    2,                      // Piutang → Neraca
+                    2,                      // PPN → Neraca
+                    $noTransaksi,
+                    'PPN',
+                    false
+                );
+            }
+
+            // 4) Biaya lain yang DITAGIHKAN ke customer (kalau ada)
+            //    Supaya Piutang bertambah lagi sampai GRANDTOTAL
+            //    Debit  : Piutang (20)          = biayaLain
+            //    Kredit : Pendapatan lain (50)  = biayaLain
+            if ($biayaLain > 0) {         // [change]
+                $this->insertJurnalSimple(
+                    $tglSql,
+                    (float) $biayaLain,
+                    'Biaya lain penjualan ' . $noTransaksi,
+                    $akunPiutangUsaha,      
+                    $akunPendapatanLain,    
+                    2,                      // Piutang → Neraca
+                    1,                      // Pendapatan lain → Laba Rugi
+                    $noTransaksi,
+                    'BIAYA_LAIN',
+                    false
+                );
+            }
+
+            // [change] Sampai di sini:
+            // - Total Kredit akun 15 (Pendapatan)  = SUBTOTAL
+            // - Total Debet akun 20 (Piutang)      = GRANDTOTAL
+            //   (subtotal - diskon + pajak + biayaLain)
+
+        } else {
+            $this->insertJurnalSimple(
+                $tglSql,
+                $nominalJurnal,
+                $keterangan,
+                $akunDebet,
+                $akunKredit,
+                $jenisLaporanDebet,
+                $jenisLaporanKredit,
+                $noTransaksi,
+                $request->tipe,
+                $kreditMenambahSaldo
+            );
+        }
 
         // Jurnal HPP (Penjualan saja)
         if ($jenisCode === 1 && $totalHppMentah > 0) {
@@ -772,13 +869,13 @@ public function store(Request $request)
                 false
             );
         }
-
-        // Tambah saldo berjalan akun 17 (sesuai aturan kamu)
+        
+        
         if (!empty($tambahAkun17)) {
             DB::table('mst_akun')
                 ->where('id', 17)     
                 ->lockForUpdate()
-                ->increment('saldo_berjalan', (float) $grandTotal);
+                ->increment('saldo_berjalan', (float) $totalHarga);
         }
 
         

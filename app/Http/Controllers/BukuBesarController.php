@@ -364,10 +364,23 @@ public function storeSaldoAwal(Request $r)
                     'updated_at'    => now(),
                 ]);
 
-                // Ambil saldo berjalan terbaru
-                $saldoAkunAfter  = $toInt(DB::table('mst_akun')->lockForUpdate()->where('id', $mstId)->value('saldo_berjalan'));
-                $saldoModalAfter = $toInt(DB::table('mst_akun')->lockForUpdate()->where('id', $modalId)->value('saldo_berjalan'));
+                $userId = session('user_id');
+                  $saldoAkunAfter = $toInt(
+                    DB::table('mst_akun')
+                        ->where('id', $mstId)
+                        ->where('created_by', $userId)
+                        ->lockForUpdate()
+                        ->value('saldo_berjalan')
+                );
 
+                $saldoModalAfter = $toInt(
+                    DB::table('mst_akun')
+                        ->where('id', $modalId)
+                        ->where('created_by', $userId)
+                        ->lockForUpdate()
+                        ->value('saldo_berjalan')
+                );
+// dd($saldoAkunAfter);
                 if ($isDebitNature) {
                     // Dr Akun Induk, Cr Modal
                     DB::table('dat_detail_jurnal')->insert([
@@ -972,32 +985,58 @@ public function storetransaksi(Request $request)
         return (int) preg_replace('/[^\d\-]/', '', (string)($v ?? '0'));
     };
 
-    if ($debetMengurangiSaldo) {                                              // [changes]
-        $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
-            ->decrement('saldo_berjalan', $nominal);
-    } else {
-        $affD = DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
-            ->increment('saldo_berjalan', $nominal);
-    }
-    if ($affD === 0) {
-        throw new \RuntimeException("Akun debet (ID {$akunDebet}) tidak ditemukan di mst_akun.");
-    }
-    $saldoDebetAfter = $toInt(DB::table('mst_akun')->where('id', $akunDebet)->lockForUpdate()
-        ->value('saldo_berjalan'));                                           // [changes]
+    $userId = $this->userId;
+        if ($debetMengurangiSaldo) {                                              // [changes]
+            $affD = DB::table('mst_akun')
+                ->where('id', $akunDebet)
+                ->where('created_by', $userId)                                    // [changes]
+                ->lockForUpdate()
+                ->decrement('saldo_berjalan', $nominal);
+        } else {
+            $affD = DB::table('mst_akun')
+                ->where('id', $akunDebet)
+                ->where('created_by', $userId)                                    // [changes]
+                ->lockForUpdate()
+                ->increment('saldo_berjalan', $nominal);
+        }
 
-    if ($kreditMenambahSaldo) {                                               // [changes]
-        $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
-            ->increment('saldo_berjalan', $nominal);
-    } else {
-        $affK = DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
-            ->decrement('saldo_berjalan', $nominal);
-    }
-    if ($affK === 0) {
-        throw new \RuntimeException("Akun kredit (ID {$akunKredit}) tidak ditemukan di mst_akun.");
-    }
-    $saldoKreditAfter = $toInt(DB::table('mst_akun')->where('id', $akunKredit)->lockForUpdate()
-        ->value('saldo_berjalan'));                                           // [changes]
+        if ($affD === 0) {
+            throw new \RuntimeException("Akun debet (ID {$akunDebet}) tidak ditemukan di mst_akun.");
+        }
 
+        $saldoDebetAfter = $toInt(
+            DB::table('mst_akun')
+                ->where('id', $akunDebet)
+                ->where('created_by', $userId)                                    // [changes]
+                ->lockForUpdate()
+                ->value('saldo_berjalan')
+        );                                                                         // [changes]
+
+        if ($kreditMenambahSaldo) {                                               // [changes]
+            $affK = DB::table('mst_akun')
+                ->where('id', $akunKredit)
+                ->where('created_by', $userId)                                    // [changes]
+                ->lockForUpdate()
+                ->increment('saldo_berjalan', $nominal);
+        } else {
+            $affK = DB::table('mst_akun')
+                ->where('id', $akunKredit)
+                ->where('created_by', $userId)                                    // [changes]
+                ->lockForUpdate()
+                ->decrement('saldo_berjalan', $nominal);
+        }
+
+        if ($affK === 0) {
+            throw new \RuntimeException("Akun kredit (ID {$akunKredit}) tidak ditemukan di mst_akun.");
+        }
+
+        $saldoKreditAfter = $toInt(
+            DB::table('mst_akun')
+                ->where('id', $akunKredit)
+                ->where('created_by', $userId)                                    // [changes]
+                ->lockForUpdate()
+                ->value('saldo_berjalan')
+        );
     DB::table('dat_detail_jurnal')->insert([
         [
             'id_jurnal'       => $idJurnal,

@@ -19,68 +19,75 @@ class FakturController extends Controller
         return view('faktur.index');
     }
 
-    public function datatableTransaksi()
-    {
-        $agg = DB::table('dat_transaksi as t')
-            ->select(
-                't.no_transaksi',
-                DB::raw('MIN(t.tgl) as tgl'),
-                DB::raw('MAX(t.jenis_transaksi) as jenis_transaksi'),
-                DB::raw('MAX(t.id_kontak) as id_kontak'),
-                DB::raw('SUM(t.jml_barang) as qty'),
-                DB::raw('SUM(t.total) as total')
-            )
-            ->groupBy('t.no_transaksi');
+ public function datatableTransaksi()
+{
+    // [change] ambil id user login untuk filter created_by
+    $userId = $this->userId; 
 
-        $x = DB::query()->fromSub($agg, 'x')
-            ->leftJoin('dat_pelanggan as pl', function($j){
-                $j->on('pl.id_pelanggan', '=', 'x.id_kontak')
-                  ->where('x.jenis_transaksi', '=', 1);
-            })
-            ->leftJoin('dat_pemasok as ps', function($j){
-                $j->on('ps.id_pemasok', '=', 'x.id_kontak')
-                  ->where('x.jenis_transaksi', '=', 2);
-            })
-            ->select([
-                'x.no_transaksi',
-                'x.tgl',
-                'x.jenis_transaksi',
-                DB::raw('COALESCE(pl.nama_pelanggan, ps.nama_pemasok) as nama_kontak'),
-                'x.qty',
-                'x.total',
-                DB::raw("(SELECT b.nama_barang 
-                          FROM dat_transaksi t2 
-                          JOIN dat_barang b ON b.id_barang = t2.id_barang
-                          WHERE t2.no_transaksi = x.no_transaksi
-                          ORDER BY t2.id_transaksi ASC
-                          LIMIT 1) as deskripsi")
-            ])
-            ->orderByDesc('x.tgl')
-            ->orderByDesc('x.no_transaksi')
-            ->get();
+    $agg = DB::table('dat_transaksi as t')
+        ->select(
+            't.no_transaksi',
+            DB::raw('MIN(t.tgl) as tgl'),
+            DB::raw('MAX(t.jenis_transaksi) as jenis_transaksi'),
+            DB::raw('MAX(t.id_kontak) as id_kontak'),
+            DB::raw('SUM(t.jml_barang) as qty'),
+            DB::raw('SUM(t.total) as total')
+        )
+       
+        ->when($userId, function ($q) use ($userId) {
+            $q->where('t.created_by', $userId);
+        })
+        ->groupBy('t.no_transaksi');
 
-            $rows = $x->map(function($r){
-            switch ((int)$r->jenis_transaksi) {
-                case 1: $tipe = 'Penjualan'; break;
-                case 2: $tipe = 'Inventaris'; break;
-                case 3: $tipe = 'Kas & Bank'; break;
-                default: $tipe = 'Inventaris';
-            }
+    $x = DB::query()->fromSub($agg, 'x')
+        ->leftJoin('dat_pelanggan as pl', function($j){
+            $j->on('pl.id_pelanggan', '=', 'x.id_kontak')
+              ->where('x.jenis_transaksi', '=', 1);
+        })
+        ->leftJoin('dat_pemasok as ps', function($j){
+            $j->on('ps.id_pemasok', '=', 'x.id_kontak')
+              ->where('x.jenis_transaksi', '=', 2);
+        })
+        ->select([
+            'x.no_transaksi',
+            'x.tgl',
+            'x.jenis_transaksi',
+            DB::raw('COALESCE(pl.nama_pelanggan, ps.nama_pemasok) as nama_kontak'),
+            'x.qty',
+            'x.total',
+            DB::raw("(SELECT b.nama_barang 
+                      FROM dat_transaksi t2 
+                      JOIN dat_barang b ON b.id_barang = t2.id_barang
+                      WHERE t2.no_transaksi = x.no_transaksi
+                      ORDER BY t2.id_transaksi ASC
+                      LIMIT 1) as deskripsi")
+        ])
+        ->orderByDesc('x.tgl')
+        ->orderByDesc('x.no_transaksi')
+        ->get();
 
-            return [
-                'tgl'           => $r->tgl,
-                'tipe_label'    => $tipe,
-                'no_transaksi'  => $r->no_transaksi,
-                'nama_kontak'   => $r->nama_kontak ?: '-',
-                'deskripsi'     => $r->deskripsi ?: '-',
-                'qty'           => (float) $r->qty,
-                'total'         => (float) $r->total,
-            ];
-        });
+    $rows = $x->map(function($r){
+        switch ((int)$r->jenis_transaksi) {
+            case 1: $tipe = 'Penjualan'; break;
+            case 2: $tipe = 'Inventaris'; break;
+            case 3: $tipe = 'Kas & Bank'; break;
+            default: $tipe = 'Inventaris';
+        }
 
+        return [
+            'tgl'           => $r->tgl,
+            'tipe_label'    => $tipe,
+            'no_transaksi'  => $r->no_transaksi,
+            'nama_kontak'   => $r->nama_kontak ?: '-',
+            'deskripsi'     => $r->deskripsi ?: '-',
+            'qty'           => (float) $r->qty,
+            'total'         => (float) $r->total,
+        ];
+    });
 
-        return response()->json(['data' => $rows]);
-    }
+    return response()->json(['data' => $rows]);
+}
+
 
 
 
