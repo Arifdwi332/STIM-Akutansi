@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BepController;
 use App\Http\Controllers\BukuUtangController;
 use App\Http\Controllers\AuthController;
+use Illuminate\Support\Facades\Auth;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -39,7 +40,7 @@ Route::post('/register', [AuthController::class, 'register'])->name('mstuser.reg
 // [change] route login harus bernama "login" supaya middleware auth redirect ke sini
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('mstuser.login.process');
-
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // ================== PROTECTED ROUTES (BUTUH LOGIN) ==================
 // [change] semua route di bawah ini hanya bisa diakses jika sudah login
 Route::middleware('umkm.auth')->group(function () {

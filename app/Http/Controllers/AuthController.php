@@ -7,7 +7,7 @@ use App\Models\MstAkunModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-
+use Illuminate\Support\Facades\Auth;
 class AuthController extends Controller
 {
     public function showRegisterForm()
@@ -51,9 +51,9 @@ class AuthController extends Controller
         });
 
         return redirect()
-            ->back()
-            ->with('success', 'Registrasi berhasil. Akun-akun default berhasil dibuat.');
-    }
+        ->to('/login') 
+        ->with('success', 'Registrasi berhasil. Akun-akun default berhasil dibuat.');
+}
 
      public function showLoginForm()
     {
@@ -87,5 +87,21 @@ class AuthController extends Controller
         return redirect()->to('/'); 
     }
 
+      public function logout(Request $request)
+    {
+        
+        Auth::logout();
+
+       
+        $request->session()->invalidate();
+
+       
+        $request->session()->regenerateToken();
+
+        
+        return redirect()
+            ->to('/login')
+            ->with('success', 'Berhasil logout.');
+    }
 
 }
