@@ -162,6 +162,8 @@
                 const toNum = v => Number(String(v ?? 0).replace(/[^\d.-]/g, '')) || 0;
                 const rp = n => 'Rp. ' + toNum(n).toLocaleString('id-ID');
 
+                let labaRugiBerjalan = 0;
+
                 function loadLabaRugi(page = 1) {
                     const q = $('#searchJurnal').val() || '';
                     const url = "{{ route('laporan_keuangan.get_laba_rugi') }}";
@@ -219,6 +221,8 @@
 
                         const totalBeban = beban.reduce((s, i) => s + i.nilai, 0);
                         const labaBersih = totalPendapatanNet - totalBeban;
+
+                        labaRugiBerjalan = labaBersih;
 
                         if ($('#tblJurnal tbody').length === 0) $('#tblJurnal').append('<tbody></tbody>');
                         const $body = $('#tblJurnal tbody').empty();
@@ -278,7 +282,6 @@
                 loadLabaRugi();
 
 
-                // ====== NERACA ======
                 function loadNeraca(page = 1) {
                     const q = $('#searchBuku').val() || '';
                     const url = "{{ route('laporan_keuangan.get_neraca') }}";
@@ -307,33 +310,45 @@
 
                             // header kategori
                             $body.append(`
-                <tr class="table-secondary fw-bold">
-                    <td colspan="2">${kategoriMap[key]}</td>
-                </tr>
-            `);
+                            <tr class="table-secondary fw-bold">
+                                <td colspan="2">${kategoriMap[key]}</td>
+                            </tr>
+                        `);
 
                             let subtotal = 0;
                             rows.forEach(r => {
                                 const namaAkun = r.nama_akun ?? '';
                                 let saldo = Number(r.saldo ?? 0);
 
-                                // [change] ambil id akun (sesuaikan dengan field dari API-mu)
+                                // [CHANGES] ambil tambahan informasi akun
                                 const akunId = r.id_akun ?? r.id ?? null;
+                                const kodeAkun = String(r.kode_akun ?? '');
 
-                                // [change] khusus LIABILITAS → selalu positif,
+                                // [CHANGES] khusus LIABILITAS → selalu positif,
                                 // kecuali akun Utang PPN (id = 72) yang pakai saldo asli
                                 if (key === "liabilitas" && akunId !== 72) {
                                     saldo = Math.abs(saldo);
                                 }
 
+                                // [CHANGES] khusus EKUITAS:
+                                // akun laba ditahan / laba rugi ambil saldo dari total laba/rugi (labaRugiBerjalan)
+                                if (key === "ekuitas") {
+                                    const namaLower = namaAkun.toLowerCase();
+                                    // sesuaikan kondisi ini dengan kode / nama akun laba ditahan Anda
+                                    if (kodeAkun === '3301' || /laba/.test(namaLower) || /rugi/
+                                        .test(namaLower)) {
+                                        saldo = labaRugiBerjalan;
+                                    }
+                                }
+
                                 subtotal += saldo;
 
                                 $body.append(`
-                    <tr>
-                        <td>${namaAkun}</td>
-                        <td class="text-end">${rp(saldo)}</td>
-                    </tr>
-                `);
+                                <tr>
+                                    <td>${namaAkun}</td>
+                                    <td class="text-end">${rp(saldo)}</td>
+                                </tr>
+                            `);
                             });
 
                             if (key === "aset") totalAset = subtotal;
@@ -342,32 +357,28 @@
 
                             // total kategori
                             $body.append(`
-                <tr class="font-weight-bold text-black">
-                    <td>TOTAL ${kategoriMap[key]}</td>
-                    <td class="text-end">${rp(subtotal)}</td>
-                </tr>
-            `);
+                            <tr class="font-weight-bold text-black">
+                                <td>TOTAL ${kategoriMap[key]}</td>
+                                <td class="text-end">${rp(subtotal)}</td>
+                            </tr>
+                        `);
                         });
 
                         const totalLiabEkuitas = totalLiabilitas + totalEkuitas;
                         $body.append(`
-            <tr class="row-grand">
-                <td>Total Liabilitas + Ekuitas</td>
-                <td class="text-end">${rp(totalLiabEkuitas)}</td>
-            </tr>
-        `);
+                        <tr class="row-grand">
+                            <td>Total Liabilitas + Ekuitas</td>
+                            <td class="text-end">${rp(totalLiabEkuitas)}</td>
+                        </tr>
+                    `);
                         $('#pgBuku').text(`Total akun: ${res.total ?? 0} | Hal: ${res.page ?? 1}`);
                     }).fail(function(xhr) {
                         console.error('loadNeraca error:', xhr?.responseText || xhr.statusText);
                     });
                 }
 
-
-
-
                 $('#searchBuku').on('input', () => loadNeraca(1));
                 loadNeraca();
-
 
             })();
         </script>
