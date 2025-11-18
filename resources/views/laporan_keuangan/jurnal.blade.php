@@ -221,6 +221,44 @@
                     return 'Rp. ' + n.toLocaleString('id-ID');
                 };
 
+                // [CHANGES] Helper umum untuk render tombol pagination Prev / Next
+                function renderPager($wrapper, res, onGoPage) {
+                    const pageNow = Number(res.page || 1);
+                    const perPage = Number(res.per_page || 20);
+                    const total = Number(res.total || (res.data ? res.data.length : 0));
+                    const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+                    const html = `
+                        <div class="d-flex align-items-center justify-content-end">
+                            <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                data-role="prev"
+                                ${pageNow <= 1 ? 'disabled' : ''}>
+                                &lsaquo; Prev
+                            </button>
+                            <span class="mx-2 small">Hal ${pageNow} / ${totalPages}</span>
+                            <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                data-role="next"
+                                ${pageNow >= totalPages ? 'disabled' : ''}>
+                                Next &rsaquo;
+                            </button>
+                            <span class="ms-2 small text-muted">Total: ${total}</span>
+                        </div>
+                    `;
+
+                    $wrapper.html(html);
+
+                    // hapus handler lama lalu pasang yang baru (supaya tidak dobel)
+                    $wrapper.off('click.bbpg').on('click.bbpg', 'button[data-role]', function() {
+                        const role = $(this).data('role');
+                        if (role === 'prev' && pageNow > 1) {
+                            onGoPage(pageNow - 1);
+                        } else if (role === 'next' && pageNow < totalPages) {
+                            onGoPage(pageNow + 1);
+                        }
+                    });
+                }
                 // ====== JURNAL UMUM ======
                 function loadJurnal(page = 1) {
                     const q = $('#searchJurnal').val() || '';
@@ -237,16 +275,19 @@
                         (res.data || []).forEach(r => {
                             $body.append(
                                 `<tr>
-                        <td>${r.tanggal ?? ''}</td>
-                        <td>${r.keterangan ?? ''}</td>
-                        <td>${r.nama_akun ?? ''}</td>
-                        <td class="text-success">${rp(r.debet)}</td>
-                        <td class="text-danger">${rp(r.kredit)}</td>
-                    </tr>`
+                                    <td>${r.tanggal ?? ''}</td>
+                                    <td>${r.keterangan ?? ''}</td>
+                                    <td>${r.nama_akun ?? ''}</td>
+                                    <td class="text-success">${rp(r.debet)}</td>
+                                    <td class="text-danger">${rp(r.kredit)}</td>
+                                </tr>`
                             );
                         });
 
-                        $('#pgJurnal').text(`Total: ${res.total} | Hal: ${res.page}`);
+                        // [CHANGES] ganti text biasa jadi tombol Prev/Next
+                        renderPager($('#pgJurnal'), res, function(goPage) {
+                            loadJurnal(goPage);
+                        });
                     });
                 }
 
@@ -269,16 +310,21 @@
                         (res.data || []).forEach(r => {
                             $body.append(
                                 `<tr>
-                        <td>${r.nama_akun ?? ''}</td>
-                        <td>${r.tanggal ?? ''}</td>
-                        <td class="text-success">${rp(r.debet)}</td>
-                        <td class="text-danger">${rp(r.kredit)}</td>
-                        <td>${rp(r.saldo)}</td>
-                    </tr>`
+                                    <td>${r.nama_akun ?? ''}</td>
+                                    <td>${r.tanggal ?? ''}</td>
+                                    <td class="text-success">${rp(r.debet)}</td>
+                                    <td class="text-danger">${rp(r.kredit)}</td>
+                                    <td>${rp(r.saldo)}</td>
+                                </tr>`
                             );
                         });
 
-                        $('#pgBuku').text(`Total: ${res.total} | Hal: ${res.page}`);
+                        // [CHANGES] pagination untuk buku besar (kalau tabelnya ada di halaman ini)
+                        if ($('#pgBuku').length) {
+                            renderPager($('#pgBuku'), res, function(goPage) {
+                                loadBuku(goPage);
+                            });
+                        }
                     });
                 }
 

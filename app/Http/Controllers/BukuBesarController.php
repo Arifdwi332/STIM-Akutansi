@@ -200,10 +200,30 @@ public function storeSaldoAwal(Request $r)
                 ? true
                 : (in_array($akunKode, ['2101','2201']) ? false : in_array(substr($akunKode, 0, 1), ['1','5']));
 
+           $akunTambahModal = [
+                '1101','1102','1103','1104','1105','1106',
+                '1201','1202','1203','1204',
+                '4101',
+                '4103', // NOTE: 4103 juga ada di grup pengurang, di-logika bawah akan diikuti sebagai pengurang
+                '4510',
+                '4511',
+            ];
+
+            $akunKurangiModal = [
+                '2101','2102','2103','2104','2105','2106',
+                '2201','2202',
+                '4102',
+                '4103', // muncul di dua grup → diperlakukan sebagai pengurang supaya tidak double efek
+                '5104',
+                '6101','6102','6103',
+                '6201','6202','6203','6204','6205','6208','6209','6210','6211','6212','6213',
+                '6301','6302',
+            ];
+
             // Akun pasangan: Modal 3101
             /** @var MstAkunModel $modalAcc */
             $modalAcc = MstAkunModel::where('kode_akun', '3101')
-                ->where('created_by', $userId)   
+                ->where('created_by', $userId)
                 ->lockForUpdate()
                 ->firstOrFail();
             $modalId  = (int) $modalAcc->id;
@@ -317,22 +337,42 @@ public function storeSaldoAwal(Request $r)
             }
 
             // Penyesuaian saldo akun modal
-            if ($total > 0) {
-                if (in_array($akunKode, ['1101','1103','1104'], true)) {
-                    $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
-                    $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+            // if ($total > 0) {
+            //     if (in_array($akunKode, ['1101','1103','1104'], true)) {
+            //         $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
+            //         $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+            //         $modalAcc->saldo_awal     = (string)($mAwal + $total);
+            //         $modalAcc->saldo_berjalan = (string)($mJalan + $total);
+            //         $modalAcc->save();
+            //     } elseif (in_array($akunKode, ['2101','2201'], true)) {
+            //         $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
+            //         $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+            //         $modalAcc->saldo_awal     = (string)($mAwal - $total);
+            //         $modalAcc->saldo_berjalan = (string)($mJalan - $total);
+            //         $modalAcc->save();
+            //     }
+            // }
+
+             if ($total > 0) {
+                $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
+                $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+
+                $isTambahModal  = in_array($akunKode, $akunTambahModal, true)
+                    && !in_array($akunKode, $akunKurangiModal, true); // jika dobel, diprioritaskan sebagai pengurang
+                $isKurangiModal = in_array($akunKode, $akunKurangiModal, true);
+
+                if ($isTambahModal) {
+                    // akun yang *menambah* modal → saldo modal 3101 bertambah
                     $modalAcc->saldo_awal     = (string)($mAwal + $total);
                     $modalAcc->saldo_berjalan = (string)($mJalan + $total);
                     $modalAcc->save();
-                } elseif (in_array($akunKode, ['2101','2201'], true)) {
-                    $mAwal  = $toInt($modalAcc->saldo_awal ?? '0');
-                    $mJalan = $toInt($modalAcc->saldo_berjalan ?? '0');
+                } elseif ($isKurangiModal) {
+                    // akun yang *mengurangi* modal → saldo modal 3101 berkurang
                     $modalAcc->saldo_awal     = (string)($mAwal - $total);
                     $modalAcc->saldo_berjalan = (string)($mJalan - $total);
                     $modalAcc->save();
                 }
             }
-
             // ===== Jurnal per TANGGAL REQUEST =====
             // kunci: tanggal disimpan dari request (dinormalisasi ke Y-m-d)
             $aggPerTanggal = [];  // ['Y-m-d' => total]
@@ -592,8 +632,43 @@ public function storetransaksi(Request $request)
                 'updated_at'    => now(),
             ]);
 
+            $periode = Carbon::parse($tanggal)->format('Y-m');
             // === 2) DETAIL JURNAL ===
-           
+            foreach ([
+                $akunD => ['debit' => $nominal, 'kredit' => 0],
+                $akunK => ['debit' => 0,        'kredit' => $nominal],
+            ] as $akunId => $val) {
+
+                $bukbes = DB::table('dat_buku_besar')
+                    ->where('created_by', $userId)              // [CHANGES]
+                    ->where('id_akun', $akunId)
+                    ->where('periode', $periode)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($bukbes) {
+                    DB::table('dat_buku_besar')
+                        ->where('created_by', $userId)          // [CHANGES]
+                        ->where('id_bukbes', $bukbes->id_bukbes)
+                        ->update([
+                            'ttl_debit'   => (float)$bukbes->ttl_debit   + (float)$val['debit'],
+                            'ttl_kredit'  => (float)$bukbes->ttl_kredit  + (float)$val['kredit'],
+                            'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
+                            'updated_at'  => now(),
+                        ]);
+                } else {
+                    DB::table('dat_buku_besar')->insert([
+                        'id_akun'     => $akunId,
+                        'periode'     => $periode,
+                        'ttl_debit'   => (float)$val['debit'],
+                        'ttl_kredit'  => (float)$val['kredit'],
+                        'saldo_akhir' => (float)$val['debit'] - (float)$val['kredit'],
+                        'created_by'  => $userId,               // [CHANGES]
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]);
+                }
+            }
             DB::table('dat_detail_jurnal')->insert([
                 [
                     'id_jurnal'  => $idJurnal,
@@ -874,6 +949,7 @@ public function storetransaksi(Request $request)
                 'Bayar Pemeliharaan',
                 'Bayar Pemeliharaan (Servis, dll)',      
                 'Bayar Lain-lain',
+                'Pendapatan Lain-lain (Komisi/Hadiah)',
             ];
 
             if (in_array($tipe, $tipeSaldoKeluar, true)) {

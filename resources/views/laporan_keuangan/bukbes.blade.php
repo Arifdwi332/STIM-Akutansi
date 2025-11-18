@@ -253,6 +253,7 @@
                     '<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>'
                 );
 
+
                 const payload = {
                     per_page: 100
                 };
