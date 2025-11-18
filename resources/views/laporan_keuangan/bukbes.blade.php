@@ -229,7 +229,7 @@
                                 <tr>
                                     <th>Tanggal</th>
                                     <th>Keterangan</th>
-                                    <th>Nama</th>
+
                                     <th>Debet</th>
                                     <th>Kredit</th>
                                     <th>Saldo</th>
@@ -280,7 +280,7 @@
                 <tr>
                     <td>${r.tanggal ?? ''}</td>
                     <td>${r.keterangan ?? ''}</td>
-                    <td>${r.nama_akun ?? ''}</td>
+                   
                     <td class="text-success">${rp(r.debet)}</td>
                     <td class="text-danger">${rp(r.kredit)}</td>
                     <td>${rp(saldoView)}</td>

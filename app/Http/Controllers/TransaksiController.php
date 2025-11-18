@@ -143,7 +143,7 @@ class TransaksiController extends Controller
         return response()->json(['ok' => false, 'message' => $v->errors()->first()], 422);
     }
 
-    // Opsional: pastikan id & kode cocok
+   
     $match = DB::table('dat_pemasok')
         ->where('id_pemasok', $request->pemasok_id)
         ->where('kode_pemasok', $request->kode_pemasok)
@@ -163,6 +163,7 @@ class TransaksiController extends Controller
         'harga_jual'   => $request->harga_jual2,
         'stok_awal'    => 0,
         'stok_akhir'   => 0,
+        'created_by'   => $this->userId,
     ]);
    
 
@@ -528,9 +529,7 @@ public function store(Request $request)
         return response()->json(['ok' => false, 'message' => 'Format tanggal tidak valid'], 422);
     }
 
-    // ============================
-    // Normalisasi item & subtotal
-    // ============================
+   
     $items = collect($request->items)->map(function($it) use ($request) {
         $qty   = (float) $it['qty'];
         $harga = ($request->tipe === 'Penjualan')
@@ -635,7 +634,10 @@ public function store(Request $request)
                 throw new \RuntimeException("Barang ID {$it['barang_id']} tidak ditemukan.");
             }
 
-               $base = (float) $it['total'];
+            $stokAwal = (float) $barang->stok_akhir; 
+            $qtyBaris = (float) $it['qty']; 
+
+            $base = (float) $it['total'];
             $afterDiscItem = $base - $diskonNominal;
             $share = $subtotalSafe > 0 ? ($base / $subtotalSafe) : 0.0;
             $pajakItem = $applyPajak ? (int) round($afterDiscItem * ($pajakPersen / 100)) : 0;
@@ -656,6 +658,23 @@ public function store(Request $request)
 
             $totalItem = (int) ($afterDiscItem + $pajakItem + $biayaItem);
 
+            $runningPajak += $pajakItem;
+            $runningBiaya += $biayaItem;
+
+            // Update stok
+            if ($jenisCode === 1) {
+                // Penjualan: stok berkurang
+                if ($barang->stok_akhir < $it['qty']) {
+                    throw new \RuntimeException("Stok barang {$barang->nama_barang} tidak mencukupi.");
+                }
+                $barang->decrement('stok_akhir', (float) $it['qty']);
+                $stokBerjalan = $stokAwal - $qtyBaris;
+            } else {
+                // Pembelian: stok bertambah
+                $barang->increment('stok_akhir', (float) $it['qty']);
+                $stokBerjalan = $stokAwal + $qtyBaris;
+            }
+            
             $rows[] = [
                 'id_kontak'         => $idKontak,
                 'id_barang'         => (int) $it['barang_id'],
@@ -673,25 +692,12 @@ public function store(Request $request)
                 'total'             => $totalItem,
                 'biaya_lain'        => (float) $biayaLain,
                 'diskon'            => (float) $diskonNominal,
+                'stok_berjalan'     => $stokBerjalan, 
                 'created_by'        => $userId,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ];
 
-            $runningPajak += $pajakItem;
-            $runningBiaya += $biayaItem;
-
-            // Update stok
-            if ($jenisCode === 1) {
-                // Penjualan: stok berkurang
-                if ($barang->stok_akhir < $it['qty']) {
-                    throw new \RuntimeException("Stok barang {$barang->nama_barang} tidak mencukupi.");
-                }
-                $barang->decrement('stok_akhir', (float) $it['qty']);
-            } else {
-                // Pembelian: stok bertambah
-                $barang->increment('stok_akhir', (float) $it['qty']);
-            }
         }
 
         DB::table('dat_transaksi')->insert($rows);
@@ -1104,97 +1110,87 @@ private function insertJurnalSimple(
     });
 }
 
-public function datatableTransaksi(Request $r) // [CHANGES] terima Request
+public function datatableTransaksi(Request $r)
 {
-    // [CHANGES] Ambil parameter filter dari querystring
-    $tglAwal = $r->query('tgl_awal');
-    $tglAkhir = $r->query('tgl_akhir');
-    $tipeParam = $r->query('tipe'); // contoh: "Penjualan" / "Inventaris" / 1 / 2
-    $userId = $this->userId;
-    // [CHANGES] Map tipeParam -> jenis_transaksi (1=Penjualan, 2=Inventaris)
+    $tglAwal   = $r->query('tgl_awal');
+    $tglAkhir  = $r->query('tgl_akhir');
+    $tipeParam = $r->query('tipe');
+    $userId    = $this->userId;
+
+    // Map tipeParam -> jenis_transaksi (1=Penjualan, 2=Inventaris)
     $jenisFilter = null;
     if ($tipeParam !== null && $tipeParam !== '') {
         if (is_numeric($tipeParam)) {
             $jenisFilter = (int) $tipeParam;
         } else {
             $t = strtolower(trim($tipeParam));
-            if (in_array($t, ['penjualan', 'jual'], true))     $jenisFilter = 1;
-            if (in_array($t, ['inventaris', 'pembelian', 'beli'], true)) $jenisFilter = 2;
+            if (in_array($t, ['penjualan','jual'], true)) {
+                $jenisFilter = 1;
+            }
+            if (in_array($t, ['inventaris','pembelian','beli'], true)) {
+                $jenisFilter = 2;
+            }
         }
-        if (!in_array($jenisFilter, [1, 2], true)) $jenisFilter = null;
+        if (!in_array($jenisFilter, [1,2], true)) {
+            $jenisFilter = null;
+        }
     }
 
-    // [CHANGES] Bangun base query agar filter diaplikasikan SEBELUM agregasi
-    $base = DB::table('dat_transaksi as t')
-        ->select(
+    $q = DB::table('dat_transaksi as t')
+        ->leftJoin('dat_barang as b', 'b.id_barang', '=', 't.id_barang')
+        // JOIN PELANGGAN (untuk Penjualan)
+        ->leftJoin('dat_pelanggan as pl', function ($join) use ($userId) {
+            $join->on('pl.id_pelanggan', '=', 't.id_kontak')
+                 ->where('t.jenis_transaksi', 1)
+                 ->where('pl.created_by', $userId);
+        })
+        // JOIN PEMASOK (untuk Inventaris/Pembelian)
+        ->leftJoin('dat_pemasok as ps', function ($join) use ($userId) {
+            $join->on('ps.id_pemasok', '=', 't.id_kontak')
+                 ->where('t.jenis_transaksi', 2)
+                 ->where('ps.created_by', $userId);
+        })
+        ->whereIn('t.jenis_transaksi', [1,2])
+        ->where('t.created_by', $userId)
+        ->select([
+            't.tgl',
+            't.jenis_transaksi',
             't.no_transaksi',
-            DB::raw('MIN(t.tgl) as tgl'),
-            DB::raw('MAX(t.jenis_transaksi) as jenis_transaksi'),
-            DB::raw('MAX(t.id_kontak) as id_kontak'),
-            DB::raw('SUM(t.jml_barang) as qty'),
-            DB::raw('SUM(t.total) as total')
-        )
-        ->whereIn('t.jenis_transaksi', [1, 2])
-        ->where('t.created_by', $userId);;
+            't.jml_barang',
+            't.total',
+            't.stok_berjalan',
+            'b.nama_barang',
+            DB::raw('COALESCE(pl.nama_pelanggan, ps.nama_pemasok) as nama_kontak'),
+        ]);
 
-    // [CHANGES] Terapkan filter tanggal (inklusif)
+    // Filter tanggal
     if (!empty($tglAwal)) {
-        $base->whereDate('t.tgl', '>=', $tglAwal);
+        $q->whereDate('t.tgl', '>=', $tglAwal);
     }
     if (!empty($tglAkhir)) {
-        $base->whereDate('t.tgl', '<=', $tglAkhir);
+        $q->whereDate('t.tgl', '<=', $tglAkhir);
     }
 
-    // [CHANGES] Terapkan filter tipe jika ada
+    // Filter tipe transaksi
     if (!is_null($jenisFilter)) {
-        $base->where('t.jenis_transaksi', $jenisFilter);
+        $q->where('t.jenis_transaksi', $jenisFilter);
     }
 
-    // Lanjut agregasi (tetap seperti sebelumnya)
-    $agg = $base->groupBy('t.no_transaksi');
-
-    $x = DB::query()->fromSub($agg, 'x')
-        ->leftJoin('dat_pelanggan as pl', function($j) use ($userId){
-            $j->on('pl.id_pelanggan', '=', 'x.id_kontak')
-              ->where('x.jenis_transaksi', '=', 1)
-              ->where('pl.created_by', $userId);;
-        })
-       ->leftJoin('dat_pemasok as ps', function($j) use ($userId) {
-            $j->on('ps.id_pemasok', '=', 'x.id_kontak')
-            ->where('x.jenis_transaksi', 2)
-            ->where('ps.created_by', $userId);
-        })
-
-        ->select([
-            'x.no_transaksi',
-            'x.tgl',
-            'x.jenis_transaksi',
-            DB::raw('COALESCE(pl.nama_pelanggan, ps.nama_pemasok) as nama_kontak'),
-            'x.qty',
-            'x.total',
-            DB::raw("(SELECT b.nama_barang 
-                      FROM dat_transaksi t2 
-                      JOIN dat_barang b ON b.id_barang = t2.id_barang
-                      WHERE t2.no_transaksi = x.no_transaksi
-                      AND t2.created_by = {$userId}
-                      ORDER BY t2.id_transaksi ASC
-                      LIMIT 1) as deskripsi")
-        ])
-        ->orderByDesc('x.tgl')
-        ->orderByDesc('x.no_transaksi')
-        ->get();
-
-    $rows = $x->map(function($r){
-        return [
-            'tgl'           => $r->tgl,
-            'tipe_label'    => ((int)$r->jenis_transaksi === 1 ? 'Penjualan' : 'Inventaris'),
-            'no_transaksi'  => $r->no_transaksi,
-            'nama_kontak'   => $r->nama_kontak ?: '-',
-            'deskripsi'     => $r->deskripsi ?: '-',
-            'qty'           => (float) $r->qty,
-            'total'         => (float) $r->total,
-        ];
-    });
+    $rows = $q->orderByDesc('t.tgl')
+        ->orderByDesc('t.no_transaksi')
+        ->get()
+        ->map(function ($r) {
+            return [
+                'tgl'           => $r->tgl,
+                'tipe_label'    => ((int)$r->jenis_transaksi === 1 ? 'Penjualan' : 'Inventaris'),
+                'no_transaksi'  => $r->no_transaksi,
+                'nama_kontak'   => $r->nama_kontak ?: '-',
+                'deskripsi'     => $r->nama_barang ?: '-',
+                'qty'           => (float) $r->jml_barang,
+                'total'         => (float) $r->total,
+                'stok_berjalan' => (float) ($r->stok_berjalan ?? 0),
+            ];
+        });
 
     return response()->json(['data' => $rows]);
 }

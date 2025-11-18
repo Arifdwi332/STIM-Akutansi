@@ -314,7 +314,7 @@
                                     <a href="{{ route('buku_hutang.index') }}"
                                         class="nav-link {{ request()->routeIs('buku_hutang.index') ? 'active' : '' }}">
                                         <i class="far fa-circle nav-icon"></i>
-                                        <p>Buku Hutang</p>
+                                        <p>Buku Utang / Piutang</p>
                                     </a>
                                 </li>
                             </ul>

@@ -287,7 +287,7 @@
                                     <input type="text" class="form-control item-harga" readonly value="0">
                                 </td>
                                 <td class="text-right">
-                                    <input type="text" class="form-control item-jual" readonly value="0">
+                                    <input type="text" class="form-control item-jual" value="0">
                                 </td>
                                 <td class="text-right">
                                     <input type="text" class="form-control item-subtotal" value="0" readonly>
@@ -333,7 +333,7 @@
                                 <div class="input-group">
                                     <div class="input-group-prepend">
                                         <div class="input-group-text">
-                                            <input type="checkbox" id="apply_pajak" checked>
+                                            <input type="checkbox" id="apply_pajak">
                                         </div>
                                     </div>
                                     <div class="input-group-prepend"><span class="input-group-text">11%</span></div>
@@ -432,6 +432,7 @@
                                         <th>Nama Pelanggan</th>
                                         <th>Deskripsi</th>
                                         <th style="width:80px;">Qty</th>
+                                        <th style="width:80px;">Saldo Berjalan</th>
                                         <th style="width:150px;">Harga</th>
                                         <th style="width:100px;">Aksi</th>
                                     </tr>
@@ -660,19 +661,38 @@
                 bindRow($(this));
             });
 
-            // add row
             $('#inv-add').on('click', function() {
                 const $c = $body.find('tr:last').clone();
+
                 $c.find('input').val('0');
                 $c.find('.item-satuan').val('').attr('placeholder', '-');
+                $c.find('.item-subtotal').val('0');
+
+                $c.find('select.item-nama').val('');
+
                 $body.append($c);
                 renumber();
                 bindRow($c);
             });
 
+
+
             // recompute on extra fields
             $('#biaya_lain,#diskon_nominal').on('input', recompute);
         })();
+
+        function fillBarangOptions($select, list) {
+            const currentVal = $select.val();
+
+            $select.empty().append('<option value="">Pilih Barang</option>');
+            (list || []).forEach(function(b) {
+                $select.append(new Option(b.nama_barang, b.id_barang));
+            });
+
+            if (currentVal) {
+                $select.val(String(currentVal));
+            }
+        }
 
         function hydrateBarangSelects() {
             $('select.item-nama').each(function() {
@@ -680,11 +700,10 @@
             });
         }
 
-        // --- Loader barang: Penjualan => ALL, Inventaris => by pemasok
+
         function loadBarang(mode, pemasokId) {
             const isPenjualan = mode === 'Penjualan';
 
-            // OPSI A (disarankan): pakai endpoint khusus all items
             const url = isPenjualan ?
                 "{{ route('inventaris.barangSemua') }}" :
                 "{{ route('inventaris.barangByPemasok') }}";
@@ -697,12 +716,12 @@
                 .done(function(res) {
                     if (res && res.ok && Array.isArray(res.data)) {
                         BARANG = res.data;
-                        hydrateBarangSelects();
-                        if (window.recompute) window.recompute();
                     } else {
                         BARANG = [];
-                        hydrateBarangSelects();
                     }
+                    // [CHANGES] panggil setelah BARANG di-set
+                    hydrateBarangSelects();
+                    if (window.recompute) window.recompute();
                 })
                 .fail(function() {
                     // alert('Gagal memuat data barang.');
@@ -790,15 +809,22 @@
     </script>
 
     <script>
-        // Cache barang terakhir sesuai pemasok terpilih
         let BARANG = [];
 
+
+
+
         function fillBarangOptions($select, list) {
+            const currentVal = $select.val();
+
             $select.empty().append('<option value="">Pilih Barang</option>');
             (list || []).forEach(function(b) {
-                // gunakan nama & id sesuai response API
                 $select.append(new Option(b.nama_barang, b.id_barang));
             });
+
+            if (currentVal) {
+                $select.val(String(currentVal));
+            }
         }
 
         function findBarangById(id) {
@@ -838,12 +864,7 @@
             $tr.find('.item-jual').trigger('input');
         });
 
-        $(document).on('click', '#inv-add', function() {
-            setTimeout(function() {
-                const $last = $('#inv-rows tr:last');
-                fillBarangOptions($last.find('select.item-nama'), BARANG);
-            }, 0);
-        });
+
 
         function refreshHargaSemuaBaris() {
             $('#inv-rows tr').each(function() {
@@ -886,6 +907,7 @@
                 const hargajual = _num($tr.find('.item-jual').val());
                 const subtotal = _num($tr.find('.item-subtotal').val());
                 const tipeTransaksi = $('#tipe_transaksi').val();
+
                 if (id && qty > 0) {
                     items.push({
                         barang_id: id,
@@ -904,6 +926,8 @@
                 return $btn.prop('disabled', false).text('Simpan');
             }
 
+            console.log('ITEMS YANG DIKIRIM:', items);
+
             const payload = {
                 tipe: $('#tipe_transaksi').val(),
                 tanggal: $('#tgl_transaksi').val(),
@@ -915,6 +939,7 @@
                 pajak_persen: 11,
                 no_transaksi: $.trim($('#no_transaksi').val()),
                 apply_pajak: $('#apply_pajak').is(':checked') ? 1 : 0,
+
                 items: items
             };
 
@@ -1018,6 +1043,12 @@
                     },
                     {
                         data: 'qty',
+                        className: 'text-right',
+                        width: '80px',
+                        render: (v) => Number(v || 0).toString()
+                    },
+                    {
+                        data: 'stok_berjalan',
                         className: 'text-right',
                         width: '80px',
                         render: (v) => Number(v || 0).toString()
