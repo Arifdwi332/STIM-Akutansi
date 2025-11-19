@@ -474,7 +474,7 @@
                 <div class="alert alert-warning mb-0">
                     Tindakan ini akan <u>menghapus semua isi</u> tabel:
                     <code>dat_barang, dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
-                        dat_pelanggan, dat_pemasok, dat_transaksi</code><br>
+                        dat_pelanggan, dat_pemasok, dat_transaksi, dat_utang, dat_piutang</code><br>
                     dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
                     menjadi <b>0</b>.
                     <br><br>Yakin lanjut?
@@ -507,7 +507,7 @@
                 <div class="alert alert-warning mb-0">
                     Tindakan ini akan <u>menghapus semua isi</u> tabel:
                     <code> dat_buku_besar, dat_detail_jurnal, dat_detail_transaksi, dat_header_jurnal,
-                        dat_transaksi</code><br>
+                        dat_transaksi, dat_utang, dat_piutang</code><br>
                     dan <u>mereset</u> <code>saldo_awal</code> & <code>saldo_berjalan</code> di <code>mst_akun</code>
                     menjadi <b>0</b>.
                     <br><br>Yakin lanjut?

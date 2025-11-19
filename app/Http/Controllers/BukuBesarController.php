@@ -467,7 +467,7 @@ public function storeSaldoAwal(Request $r)
                             'jml_debit'       => 0,
                             'jml_kredit'      => (int)$amt,
                             'saldo_berjalan'  => (string) $saldoAkunAfter,
-                            'tanggal'         => $tglStore, // ← dari request (Y-m-d)
+                            'tanggal'         => $tglStore,
                             'created_by'         => $userId,
                             'created_at'      => now(),
                             'updated_at'      => now(),
@@ -805,20 +805,29 @@ public function storetransaksi(Request $request)
             [$akunD, $akunK, $jlD, $jlK] = $map[$tipe];
 
             if ($tipe === 'Bayar Utang Bank') {
-                $saldoUtangBank = (float) DB::table('mst_akun')->where('id', 14)->lockForUpdate()->value('saldo_berjalan');
+                $saldoUtangBank = (float) DB::table('mst_akun')
+                    ->where('id', 14)
+                    ->where('created_by', $this->userId)
+                    ->lockForUpdate()
+                    ->value('saldo_berjalan');
+
                 if ($saldoUtangBank <= 0) {
                     throw new \RuntimeException('Anda tidak memiliki utang bank.');
                 }
-                
             }
 
             if ($tipe === 'Bayar Utang Usaha') {
-                $saldoUtangUsaha = (float) DB::table('mst_akun')->where('id', 5)->lockForUpdate()->value('saldo_berjalan');
+                $saldoUtangUsaha = (float) DB::table('mst_akun')
+                    ->where('id', 5)
+                    ->where('created_by', $this->userId)
+                    ->lockForUpdate()
+                    ->value('saldo_berjalan');
+
                 if ($saldoUtangUsaha <= 0) {
                     throw new \RuntimeException('Anda tidak memiliki utang usaha.');
                 }
-              
             }
+
             if ($tipe === 'Bayar Utang Usaha') {
                 DB::table('dat_utang')
                     ->where('created_by', $userId)
@@ -1397,6 +1406,8 @@ public function resetData(Request $request)
             'dat_pelanggan',
             'dat_pemasok',
             'dat_transaksi',
+            'dat_piutang',
+            'dat_utang',
         ];
 
         try {
@@ -1439,6 +1450,8 @@ public function resetData(Request $request)
             'dat_header_jurnal',
           
             'dat_transaksi',
+            'dat_piutang',
+            'dat_utang',
         ];
 
         try {

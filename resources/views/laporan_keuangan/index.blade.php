@@ -366,10 +366,12 @@
 
                         const totalLiabEkuitas = totalLiabilitas + totalEkuitas;
                         $body.append(`
-                        <tr class="row-grand">
-                            <td>Total Liabilitas + Ekuitas</td>
-                            <td class="text-end">${rp(totalLiabEkuitas)}</td>
-                        </tr>
+                     <tr class="row-grand" style="font-weight: 700; text-transform: uppercase;">
+    <td>Total Liabilitas + Ekuitas</td>
+    <td class="text-end">${rp(totalLiabEkuitas)}</td>
+</tr>
+
+
                     `);
                         $('#pgBuku').text(`Total akun: ${res.total ?? 0} | Hal: ${res.page ?? 1}`);
                     }).fail(function(xhr) {

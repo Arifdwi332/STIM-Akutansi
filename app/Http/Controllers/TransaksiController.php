@@ -612,6 +612,23 @@ public function store(Request $request)
 
     DB::beginTransaction();
     try {
+        if ($jenisCode === 2 && $tipePembayaran === 1) { // Inventaris + Tunai
+            $saldoKas = DB::table('mst_akun')
+                ->where('id', 1)                 // akun Kas
+                ->where('created_by', $userId)
+                ->lockForUpdate()
+                ->value('saldo_berjalan');
+
+            $saldoKas = (float) ($saldoKas ?? 0);
+
+            if ($saldoKas < $grandTotal) {
+                DB::rollBack();
+                return response()->json([
+                    'ok'      => false,
+                    'message' => 'Saldo kas tidak mencukupi',
+                ], 422);
+            }
+        }
         // ============================
         // Simpan Transaksi & Update Stok
         // ============================
@@ -750,6 +767,9 @@ public function store(Request $request)
         $jenisLaporanKredit = 1;
 
         // [change] Override lama (masih boleh kalau dipakai di mode single-jurnal)
+        if ($jenisCode === 1 && $tipePembayaran === 1) {
+            $jenisLaporanDebet = 2; 
+        }
         if ($jenisCode === 1 && $tipePembayaran === 2) {
             $jenisLaporanDebet = 2; // Piutang → Neraca
         }
@@ -1182,7 +1202,7 @@ public function datatableTransaksi(Request $r)
         ->map(function ($r) {
             return [
                 'tgl'           => $r->tgl,
-                'tipe_label'    => ((int)$r->jenis_transaksi === 1 ? 'Penjualan' : 'Inventaris'),
+                'tipe_label'    => ((int)$r->jenis_transaksi === 1 ? 'Penjualan' : 'Pembelian'),
                 'no_transaksi'  => $r->no_transaksi,
                 'nama_kontak'   => $r->nama_kontak ?: '-',
                 'deskripsi'     => $r->nama_barang ?: '-',

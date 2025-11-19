@@ -365,7 +365,7 @@
 
         {{-- ==================== LIST (opsional, tetap seperti sebelumnya) ==================== --}}
         <div class="bb-panel mt-3">
-            <div class="bb-head">Penjualan</div>
+            <div class="bb-head">Penjualan / Pembelian</div>
             <div class="bb-body">
                 <ul class="nav nav-pills mb-3" id="invTab" role="tablist">
                     <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#tabTransaksi">Data
