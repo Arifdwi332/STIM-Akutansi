@@ -1322,6 +1322,9 @@ public function storetransaksi(Request $request)
     }
     public function storePemasok(Request $request)
     {
+
+        $userId = $this->userId;
+        
         $rules = [
             'nama_pemasok' => 'required|string|max:150',
             'alamat'       => 'nullable|string',
@@ -1343,7 +1346,9 @@ public function storetransaksi(Request $request)
             ], 422);
         }
 
-        $lastPemasok = PemasokModel::orderBy('id_pemasok', 'desc')->first();
+        $lastPemasok = PemasokModel::where('created_by', $userId)
+        ->orderBy('id_pemasok', 'desc')
+        ->first();
         $nextNumber = $lastPemasok ? ((int)substr($lastPemasok->kode_pemasok, 3)) + 1 : 1;
         $kodePemasok = 'SUP' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
@@ -1354,6 +1359,7 @@ public function storetransaksi(Request $request)
             'no_hp'        => $request->no_hp,
             'email'        => $request->email,
             'npwp'         => $request->npwp,
+            'created_by'   => $userId, 
             'saldo_utang'  => 0,
         ]);
 
@@ -1365,7 +1371,12 @@ public function storetransaksi(Request $request)
         'harga_jual'   => $request->harga_jual,
         'stok_awal'    => (int)$request->stok ?? 0,
         'stok_akhir'   => (int)$request->stok ?? 0,
+        'created_by'   => $userId, 
     ]);
+
+      $akunPersediaan = MstAkunModel::where('kode_akun', '1104')
+        ->where('created_by', $userId)
+        ->first();
 
     $nilaiPersediaan = (float)$request->stok * (float)$request->harga_satuan;
 
@@ -1394,8 +1405,9 @@ public function storetransaksi(Request $request)
         ],
     ]);
 }
-public function resetData(Request $request)
-    {
+    public function resetData(Request $request)
+    {        $userId = $this->userId;
+
 
         $tablesToWipe = [
             'dat_barang',
@@ -1416,11 +1428,15 @@ public function resetData(Request $request)
             DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
             foreach ($tablesToWipe as $table) {
-                DB::table($table)->delete();
+                 DB::table($table)
+                ->where('created_by', $userId)
+                ->delete();
                 DB::statement("ALTER TABLE `$table` AUTO_INCREMENT = 1");
             }
 
-            DB::table('mst_akun')->update([
+            DB::table('mst_akun')
+            ->where('created_by', $userId)
+            ->update([
                 'saldo_awal'     => 0,
                 'saldo_berjalan' => 0,
             ]);
@@ -1441,7 +1457,7 @@ public function resetData(Request $request)
 
     public function resetTransaksi(Request $request)
     {
-
+        $userId = $this->userId;
         $tablesToWipe = [
             
             'dat_buku_besar',
@@ -1460,11 +1476,16 @@ public function resetData(Request $request)
             DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
             foreach ($tablesToWipe as $table) {
-                DB::table($table)->delete();
-                DB::statement("ALTER TABLE `$table` AUTO_INCREMENT = 1");
+                 DB::table($table)
+                ->where('created_by', $userId)
+                ->delete();
+                
             }
 
-            DB::table('mst_akun')->update([
+
+            DB::table('mst_akun')
+            ->where('created_by', $userId)
+            ->update([
                 'saldo_awal'     => 0,
                 'saldo_berjalan' => 0,
             ]);

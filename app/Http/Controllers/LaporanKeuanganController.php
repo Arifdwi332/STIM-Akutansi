@@ -56,6 +56,7 @@ class LaporanKeuanganController extends Controller
         ->leftJoin('mst_akun as a2', 'a2.id', '=', 'ddj.id_akun')
         ->where('ddj.jenis_laporan', 1)
         ->where('a2.created_by', $userId)
+        ->where('ddj.created_by', $userId)
         ->selectRaw("
             ddj.id_detail as id_row,
             'jur' as sumber,
