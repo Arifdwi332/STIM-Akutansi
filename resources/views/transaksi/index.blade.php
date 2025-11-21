@@ -760,7 +760,7 @@
 
 
 
-        function loadPartyOptions(tipe) {
+        function loadPartyOptions(tipe, selectedId) {
             $.get("{{ route('inventaris.parties') }}", {
                     tipe: tipe
                 })
@@ -772,11 +772,16 @@
                             $sel.append(new Option(row.nama, row.id));
                         });
                     }
+                    // [CHANGES] kalau ada ID yang mau dipilih, set value-nya
+                    if (selectedId) {
+                        $sel.val(String(selectedId));
+                    }
                 })
                 .fail(function() {
                     alert('Gagal memuat data ' + (tipe === 'Inventaris' ? 'pemasok' : 'pelanggan'));
                 });
         }
+
 
         $(function() {
             const $tipe = $('#tipe_transaksi');

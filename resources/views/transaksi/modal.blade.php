@@ -290,6 +290,8 @@
 <script>
     $(function() {
         // ========= Helpers =========
+        // [CHANGES] helper utk tambah option ke select (prioritas ke #party_id)
+        // ========= Helpers =========
         function appendToSelect(data, preferSelector) {
             let $target = $(); // empty set
 
@@ -306,10 +308,9 @@
             }
 
             if (!$target.length) {
-                // fallback umum
-                $target = $('#pelanggan_id');
+                // [CHANGES] fallback: party_id -> pemasok_id -> select pertama
+                $target = $('#party_id');
                 if (!$target.length) $target = $('#pemasok_id');
-                if (!$target.length) $target = $('#party_id');
                 if (!$target.length) $target = $('select.form-control').first();
             }
 
@@ -321,6 +322,8 @@
                 $target.trigger('change');
             }
         }
+
+
 
 
         // ========= Pelanggan =========
@@ -344,15 +347,23 @@
                         // Normalisasi objek data (id, nama)
                         const d = res.data || {};
                         d.nama = d.nama || d.nama_pelanggan;
-                        appendToSelect(d, '#pelanggan_id'); // prioritas: pelanggan_id
+
+                        appendToSelect(d, '#party_id');
+
+                        if (window.DT_PELANGGAN) {
+                            DT_PELANGGAN.ajax.reload(null, false);
+                        }
+
                         $('#modalPelangganBaru').modal('hide');
-                        (window.toastr && toastr.success) ? toastr.success(
-                            'Pelanggan berhasil disimpan'): alert('Pelanggan berhasil disimpan');
+                        (window.toastr && toastr.success) ?
+                        toastr.success('Pelanggan berhasil disimpan'): alert(
+                            'Pelanggan berhasil disimpan');
                     } else {
                         const msg = (res && (res.message || res.error)) || 'Gagal menyimpan data';
                         (window.toastr && toastr.error) ? toastr.error(msg): alert(msg);
                     }
                 })
+
                 .fail(function(xhr) {
                     let msg = 'Gagal menyimpan data';
                     if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON
@@ -390,16 +401,50 @@
                     if (res && (res.ok || res.success)) {
                         const d = res.data || {};
                         d.nama = d.nama || d.nama_pemasok;
-                        // prioritas select pemasok/party
-                        appendToSelect(d, '#pemasok_id, #party_id');
+
+                        // [CHANGES] ambil id pemasok baru
+                        const newId = d.id || d.pemasok_id || null;
+
+                        // 1) reload dropdown party (pemasok di form transaksi)
+                        if (typeof loadPartyOptions === 'function') {
+                            // tipe 'Inventaris' = pemasok
+                            loadPartyOptions('Inventaris', newId);
+                        } else {
+                            // fallback: append langsung ke #party_id
+                            const $party = $('#party_id');
+                            if ($party.length && newId) {
+                                $party.append(new Option(d.nama, newId, true, true))
+                                    .trigger('change');
+                            }
+                        }
+
+                        // 2) reload dropdown pemasok di modal Tambah Barang
+                        if (typeof loadPemasokInventaris === 'function') {
+                            loadPemasokInventaris($('#pemasok_id')).then(function() {
+                                if (newId) {
+                                    $('#pemasok_id').val(String(newId)).trigger('change');
+                                }
+                            });
+                        }
+
+                        // 3) reload DataTable "Data Pemasok" (tab)
+                        if (window.DT_PEMASOK) {
+                            DT_PEMASOK.ajax.reload(null, false);
+                        }
+
                         $('#modalPemasokBaru').modal('hide');
-                        (window.toastr && toastr.success) ? toastr.success(
-                            'Pemasok berhasil disimpan'): alert('Pemasok berhasil disimpan');
+                        if (window.toastr && toastr.success) {
+                            toastr.success('Pemasok berhasil disimpan');
+                        } else {
+                            alert('Pemasok berhasil disimpan');
+                        }
                     } else {
                         const msg = (res && (res.message || res.error)) || 'Gagal menyimpan data';
                         (window.toastr && toastr.error) ? toastr.error(msg): alert(msg);
                     }
                 })
+
+
                 .fail(function(xhr) {
                     let msg = 'Gagal menyimpan data';
                     if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON
@@ -443,24 +488,32 @@
                 })
                 .done(function(res) {
                     if (res && res.ok) {
-                        if (window.toastr?.success) toastr.success(res.message ||
-                            'Barang tersimpan');
-                        else alert(res.message || 'Barang tersimpan');
-
+                        if (window.toastr?.success) {
+                            toastr.success(res.message || 'Barang tersimpan');
+                        } else {
+                            alert(res.message || 'Barang tersimpan');
+                        }
 
                         $('#formBarangBaru')[0].reset();
                         $('#kode_pemasok').val('');
                         $('#modalBarangBaru').modal('hide');
 
-
                         const mode = $('#tipe_transaksi').val();
                         const pemasokId = $('#party_id').val() || null;
+
+                        // [CHANGES] reload list barang untuk form (select item-nama)
                         loadBarang(mode, pemasokId);
+
+                        // [CHANGES] reload DataTable "Data Barang" (tab Inventaris)
+                        if (window.DT_INVENTARIS) {
+                            DT_INVENTARIS.ajax.reload(null, false);
+                        }
                     } else {
                         const msg = res?.message || 'Gagal menyimpan barang';
                         window.toastr?.error ? toastr.error(msg) : alert(msg);
                     }
                 })
+
                 .fail(function(xhr) {
                     const msg = xhr.responseJSON?.message || 'Gagal menyimpan barang';
                     window.toastr?.error ? toastr.error(msg) : alert(msg);

@@ -275,6 +275,7 @@
                             `<tr class="row-grand"><td>Total Laba/Rugi</td><td>${rp(labaBersih)}</td></tr>`);
 
                         $('#pgJurnal').text(`Total baris: ${rows.length} | Hal: ${res.page ?? 1}`);
+                        loadNeraca(1);
                     }).fail(xhr => console.error('loadLabaRugi error:', xhr?.responseText || xhr.statusText));
                 }
 
@@ -330,16 +331,20 @@
                                     saldo = Math.abs(saldo);
                                 }
 
-                                // [CHANGES] khusus EKUITAS:
-                                // akun laba ditahan / laba rugi ambil saldo dari total laba/rugi (labaRugiBerjalan)
+                                // [CHANGES] sesuaikan dengan kode akun saldo laba kamu: 3201
                                 if (key === "ekuitas") {
                                     const namaLower = namaAkun.toLowerCase();
-                                    // sesuaikan kondisi ini dengan kode / nama akun laba ditahan Anda
-                                    if (kodeAkun === '3301' || /laba/.test(namaLower) || /rugi/
-                                        .test(namaLower)) {
+                                    if (
+                                        kodeAkun === '3201' || kodeAkun === 3201 ||
+                                        // [CHANGES] dari 3301 -> 3201
+                                        /laba/.test(namaLower) ||
+                                        /rugi/.test(namaLower)
+                                    ) {
                                         saldo = labaRugiBerjalan;
                                     }
                                 }
+
+
 
                                 subtotal += saldo;
 
@@ -380,7 +385,6 @@
                 }
 
                 $('#searchBuku').on('input', () => loadNeraca(1));
-                loadNeraca();
 
             })();
         </script>
