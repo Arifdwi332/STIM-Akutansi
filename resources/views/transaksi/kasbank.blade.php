@@ -127,6 +127,7 @@
                                         <option value="Beli Peralatan Tunai">Beli Peralatan Tunai</option>
                                         <option value="Beli ATK Tunai">Beli ATK Tunai</option>
                                         <option value="Beli Tanah Tunai">Beli Tanah Tunai</option>
+                                        <option value="Beli Persediaan Tunai">Beli Persediaan Tunai</option>
                                         <option value="Membuat/Beli Bangunan Tunai">Membuat/Beli Bangunan Tunai</option>
 
                                         <option value="Beli Kendaraan Tunai">Beli Kendaraan Tunai</option>
@@ -135,6 +136,8 @@
                                         <option value="Jual Tanah">Jual Tanah</option>
                                         <option value="Jual Bangunan">Jual Bangunan</option>
                                         <option value="Jual Kendaraan">Jual Kendaraan</option>
+                                        <option value="Jual Jasa">Jual Jasa</option>
+
 
                                         <!-- Pendanaan & Pendapatan -->
                                         <option value="Pinjam Uang di Bank">Pinjam Uang di Bank</option>

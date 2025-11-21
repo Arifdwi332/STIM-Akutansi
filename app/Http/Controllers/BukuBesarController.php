@@ -495,6 +495,107 @@ public function storeSaldoAwal(Request $r)
 
 
 
+protected function getSaldoNormalAkun(string $kodeAkun, string $namaAkun = ''): string
+{
+    $kodeAkun = preg_replace('/\D/', '', (string) $kodeAkun);
+    $namaLower = strtolower((string) $namaAkun);
+
+ 
+    $map = [
+        // 1xx ASET LANCAR
+        '1101' => 'DEBIT',  // Kas
+        '1102' => 'DEBIT',  // Bank
+        '1103' => 'DEBIT',  // Piutang Usaha
+        '1104' => 'DEBIT',  // Persediaan Barang Dagang
+        '1105' => 'DEBIT',  // Uang Muka Pembelian
+        '1106' => 'DEBIT',  // Alat Tulis Kantor
+
+        // 12xx ASET TETAP
+        '1201' => 'DEBIT',  // Tanah
+        '1202' => 'DEBIT',  // Bangunan
+        '1203' => 'DEBIT',  // Peralatan
+        '1204' => 'DEBIT',  // Kendaraan
+        '1205' => 'KREDIT', // Akumulasi Penyusutan (kontra aset)
+
+        // 21xx UTANG LANCAR
+        '2101' => 'KREDIT', // Utang Usaha
+        '2102' => 'KREDIT', // Utang Pajak
+        '2103' => 'KREDIT', // Utang Gaji & Upah
+        '2104' => 'KREDIT', // Utang Biaya
+        '2105' => 'KREDIT', // Utang Lainnya
+        '2106' => 'KREDIT', // Utang PPN
+
+        // 22xx UTANG JANGKA PANJANG
+        '2201' => 'KREDIT', // Utang Bank
+        '2202' => 'KREDIT', // Obligasi
+
+        // 3xxx EKUITAS
+        '3101' => 'KREDIT', // Modal Disetor
+        '3201' => 'KREDIT', // Saldo / Laba
+        '3301' => 'DEBIT',  // Dividen / Prive
+
+        // 4xxx PENDAPATAN
+        '4101' => 'KREDIT', // Penjualan Barang Dagang
+        '4102' => 'KREDIT', // Potongan Penjualan
+        '4103' => 'KREDIT', // Retur Penjualan
+        '4104' => 'KREDIT', // Penjualan (lainnya)
+        '4510' => 'KREDIT', // Pendapatan Bunga
+        '4511' => 'KREDIT', // Pendapatan lain-lain
+
+        // 5xxx HPP
+        '5104' => 'DEBIT',  // Harga Pokok Penjualan
+
+        // 6xxx BEBAN
+        '6101' => 'DEBIT', // Beban Gaji
+        '6102' => 'DEBIT', // Beban Listrik
+        '6103' => 'DEBIT', // Beban Bank
+
+        '6201' => 'DEBIT', // Beban Gaji Manajemen & Administrasi
+        '6202' => 'DEBIT', // Beban Kantor
+        '6203' => 'DEBIT', // Beban Penyusutan Kantor
+        '6204' => 'DEBIT', // Beban Penyusutan Peralatan
+        '6205' => 'DEBIT', // Beban Pajak
+
+        '6208' => 'DEBIT', // Beban Ongkir
+        '6209' => 'DEBIT', // Beban Sewa
+        '6210' => 'DEBIT', // Beban Listrik Telepon
+        '6211' => 'DEBIT', // Beban Pemeliharaan
+        '6212' => 'DEBIT', // Beban Lain-lain
+        '6213' => 'DEBIT', // Beban Iklan
+
+        '6301' => 'DEBIT', // Beban Bunga
+        '6302' => 'DEBIT', // Beban Transportasi
+    ];
+
+    if (isset($map[$kodeAkun])) {
+        return $map[$kodeAkun];
+    }
+
+
+    $kelompok = substr($kodeAkun, 0, 1);
+
+    if ($kelompok === '1') {
+        return 'DEBIT';  // Aset
+    }
+    if (in_array($kelompok, ['2', '3'], true)) {
+        return 'KREDIT'; 
+    }
+    if ($kelompok === '4') {
+        return 'KREDIT';
+    }
+    if (in_array($kelompok, ['5', '6', '7', '8', '9'], true)) {
+        return 'DEBIT'; 
+    }
+
+    if (str_contains($namaLower, 'beban')) {
+        return 'DEBIT';
+    }
+    if (str_contains($namaLower, 'pendapatan')) {
+        return 'KREDIT';
+    }
+
+    return 'DEBIT';
+}
 
 
         
@@ -730,10 +831,58 @@ public function storetransaksi(Request $request)
                     'updated_at'     => now(),
                 ],
             ]);
+            $akunDebet = DB::table('mst_akun')
+                ->where('id', $akunD)
+                ->where('created_by', $userId)
+                ->lockForUpdate()
+                ->first();
 
-            // === 5) Update Saldo Akun ===
-            DB::table('mst_akun')->where('id', $akunD)->lockForUpdate()->increment('saldo_berjalan', $nominal);
-            DB::table('mst_akun')->where('id', $akunK)->lockForUpdate()->decrement('saldo_berjalan', $nominal);
+            $akunKredit = DB::table('mst_akun')
+                ->where('id', $akunK)
+                ->where('created_by', $userId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$akunDebet || !$akunKredit) { // [NEW]
+                throw new \RuntimeException('Akun tidak ditemukan.');
+            }
+
+            $normalDebet  = $this->getSaldoNormalAkun($akunDebet->kode_akun,  $akunDebet->nama_akun);
+            $normalKredit = $this->getSaldoNormalAkun($akunKredit->kode_akun, $akunKredit->nama_akun);
+               $hitungSaldoBaru = function (float $saldoAwal, string $normal, string $posisi, float $nominal): float {
+                if ($posisi === 'DEBIT') {
+                    // posting di sisi DEBIT
+                    return $normal === 'DEBIT'
+                        ? $saldoAwal + $nominal   // akun normal DEBIT, didebet → saldo naik
+                        : $saldoAwal - $nominal;  // akun normal KREDIT, didebet → saldo turun
+                }
+
+                // posting di sisi KREDIT
+                return $normal === 'KREDIT'
+                    ? $saldoAwal + $nominal      // akun normal KREDIT, dikredit → saldo naik
+                    : $saldoAwal - $nominal;     // akun normal DEBIT, dikredit → saldo turun
+            };
+
+            // [NEW] Hitung saldo baru masing-masing akun
+            $saldoDebetBaru  = $hitungSaldoBaru((float) $akunDebet->saldo_berjalan,  $normalDebet,  'DEBIT',  $nominal);
+            $saldoKreditBaru = $hitungSaldoBaru((float) $akunKredit->saldo_berjalan, $normalKredit, 'KREDIT', $nominal);
+
+            // [NEW] Update ke mst_akun
+            DB::table('mst_akun')
+                ->where('id', $akunDebet->id)
+                ->where('created_by', $userId)
+                ->update([
+                    'saldo_berjalan' => $saldoDebetBaru,
+                    'updated_at'     => now(),
+                ]);
+
+            DB::table('mst_akun')
+                ->where('id', $akunKredit->id)
+                ->where('created_by', $userId)
+                ->update([
+                    'saldo_berjalan' => $saldoKreditBaru,
+                    'updated_at'     => now(),
+                ]);
         }
 
         
@@ -755,6 +904,7 @@ public function storetransaksi(Request $request)
             'Beli Peralatan Tunai',
             'Beli ATK Tunai',
             'Beli Tanah Tunai',
+            'Beli Persediaan Tunai',
             'Membuat/Beli Bangunan Tunai',
             'Beli Kendaraan Tunai',
             'Pengambilan Pribadi',
@@ -766,6 +916,7 @@ public function storetransaksi(Request $request)
             'Jual Tanah',
             'Jual Bangunan',
             'Jual Kendaraan',
+            'Jual Jasa',
         ], true)) {
 
             $map = [
@@ -777,6 +928,7 @@ public function storetransaksi(Request $request)
                 'Bayar Piutang Usaha'                   => [20,  1, 2, 2],
                 'Beli Peralatan Tunai'                => [10, 1, 2, 2],
                 'Beli ATK Tunai'                      => [11, 1, 2, 2],
+                'Beli Persediaan Tunai'               => [6, 1, 2, 2],
                 'Pengambilan Pribadi'                 => [12, 1, 2, 2],
                 'Pinjam Uang di Bank'                 => [1,  14, 2, 2],
                 'Pendapatan Bunga'                    => [1,  58, 2, 1],
@@ -799,6 +951,7 @@ public function storetransaksi(Request $request)
                 'Jual Tanah'                          => [1, 42, 2, 2],
                 'Jual Bangunan'                       => [1, 43, 2, 2],
                 'Jual Kendaraan'                      => [1, 45, 2, 2],
+                'Jual Jasa'                           => [1, 17, 2, 1],
             ];
 
 
@@ -862,7 +1015,8 @@ public function storetransaksi(Request $request)
                 'Pendapatan Bunga',
                 'Pendapatan Lain-lain (Komisi/Hadiah)',
                 'Pinjang Uang Lainnya',  
-                'Bayar Piutang Usaha',                     
+                'Bayar Piutang Usaha',    
+                'Jual Jasa'                 
             ];
             $kreditMenambahSaldo = in_array($tipe, $tipeKreditNaik, true); 
 
