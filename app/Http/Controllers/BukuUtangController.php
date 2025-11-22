@@ -45,6 +45,7 @@ class BukuUtangController extends Controller
                 'u.tanggal',
             ])
             ->where('u.created_by', $userId)
+            ->where('ps.created_by', $userId)
             ->when($search !== '', function ($w) use ($search) {
                 $w->where(function ($x) use ($search) {
                     $x->where('u.kode_pemasok', 'like', "%{$search}%")
@@ -121,6 +122,7 @@ class BukuUtangController extends Controller
                 'p.tanggal',
             ])
             ->where('p.created_by', $userId)
+            ->where('pl.created_by', $userId)
             ->when($search !== '', function ($w) use ($search) {
                 $w->where(function ($x) use ($search) {
                     $x->where('p.no_transaksi', 'like', "%{$search}%")

@@ -1274,7 +1274,10 @@ public function getBarangByPemasok(Request $request)
         ], 404);
     }
 
-    $barang = DatBarangModel::where('kode_pemasok', $pemasok->kode_pemasok)->get();
+     $barang = DatBarangModel::where('kode_pemasok', $pemasok->kode_pemasok)
+        ->where('created_by', $this->userId)
+        ->get();
+
 
     return response()->json([
         'ok' => true,
@@ -1325,6 +1328,8 @@ public function suppliers()
         ->whereNotNull('u.kode_pemasok')
         ->where('u.kode_pemasok', '!=', '')
         ->where('u.status', 0) // hanya yang belum lunas
+        ->where('u.created_by', '=', $this->userId)
+        ->where('p.created_by', '=', $this->userId)
         ->select(
             'u.kode_pemasok',
             \DB::raw('COALESCE(p.nama_pemasok, "") as nama_pemasok')
@@ -1348,6 +1353,8 @@ public function bySupplier(Request $r)
         )
         ->where('kode_pemasok', $r->kode_pemasok)
         ->where('status', 0) // hanya yang belum lunas
+         ->where('created_by', '=', $this->userId)
+        
         ->groupBy('no_transaksi')
         ->orderByDesc(\DB::raw('MIN(tanggal)'))
         ->limit(50)
@@ -1373,9 +1380,15 @@ public function nominal(Request $r)
 
 public function customers()
 {
+    $userId = $this->userId;
+
     $rows = \DB::table('dat_piutang as dp')
-        ->leftJoin('dat_pelanggan as p', 'p.id_pelanggan', '=', 'dp.id_pelanggan')
-        ->where('dp.status', 0) // hanya yang belum lunas
+        ->leftJoin('dat_pelanggan as p', function ($join) use ($userId) {
+            $join->on('p.id_pelanggan', '=', 'dp.id_pelanggan')
+                 ->where('p.created_by', '=', $userId); // filter pelanggan per user
+        })
+        ->where('dp.status', 0)                // hanya yang belum lunas
+        ->where('dp.created_by', $userId)      // [FILTER] piutang milik user ini
         ->select(
             'dp.id_pelanggan',
             \DB::raw('COALESCE(p.nama_pelanggan,"") as nama_pelanggan'),
@@ -1393,9 +1406,12 @@ public function byCustomer(Request $r)
 {
     $r->validate(['id_pelanggan' => 'required|integer']);
 
+    $userId = $this->userId;
+
     $rows = \DB::table('dat_piutang')
         ->where('id_pelanggan', $r->id_pelanggan)
         ->where('status', 0)
+        ->where('created_by', $userId)   // [FILTER] piutang milik user ini
         ->select(
             'no_transaksi',
             \DB::raw('SUM(nominal) as nominal'),

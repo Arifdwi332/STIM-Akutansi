@@ -715,7 +715,7 @@ public function storetransaksi(Request $request)
                     ->where('created_by', $userId)   // filter multi user
                     ->lockForUpdate()
                     ->value('saldo_berjalan');
-
+                
                 if ($saldoKas < $nominal) {
                     throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi ini.");
                 }
@@ -1001,12 +1001,18 @@ public function storetransaksi(Request $request)
                 ->update(['status' => 1]);
             }
 
-             if ($tipe === 'Bayar Utang Lainnya') {                         
-                $saldoUtangLain = (float) DB::table('mst_akun')->where('id', 59)->lockForUpdate()->value('saldo_berjalan');
+             if ($tipe === 'Bayar Utang Lainnya') {
+                $saldoUtangLain = (float) DB::table('mst_akun')
+                    ->where('id', 59)
+                    ->where('created_by', $userId)
+                    ->lockForUpdate()
+                    ->value('saldo_berjalan');
+
                 if ($saldoUtangLain <= 0) {
                     throw new \RuntimeException('Anda tidak memiliki utang lainnya.');
                 }
             }
+
            
             $tipeKreditNaik = [                       
                 'Setoran Pemilik',
@@ -1026,6 +1032,18 @@ public function storetransaksi(Request $request)
                 'Bayar Piutang Usaha',
                 'Bayar Utang Lainnya',
             ];
+
+            if ($akunK == 1) {
+                $saldoKas = (float) DB::table('mst_akun')
+                    ->where('id', 1)
+                    ->where('created_by', $userId)   // ⬅️ filter per user
+                    ->lockForUpdate()
+                    ->value('saldo_berjalan');
+                if ($saldoKas < $nominal) {
+                    
+                    throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
+                }
+            }
             $debetMengurangiSaldo = in_array($tipe, $tipeDebetBerkurang, true);
             $this->insertJurnalSimple(
                 $tanggal,
@@ -1053,17 +1071,7 @@ public function storetransaksi(Request $request)
                 'created_at'       => now(),
                 'updated_at'       => now(),
             ]);
-            if ($akunK == 1) {
-                $saldoKas = (float) DB::table('mst_akun')
-                    ->where('id', 1)
-                    ->where('created_by', $userId)   // ⬅️ filter per user
-                    ->lockForUpdate()
-                    ->value('saldo_berjalan');
-
-                if ($saldoKas < $nominal) {
-                    throw new \RuntimeException("Saldo kas tidak mencukupi untuk transaksi {$tipe}.");
-                }
-            }
+         
 
             // === DETAIL TRANSAKSI ===
             DB::table('dat_detail_transaksi')->insert([

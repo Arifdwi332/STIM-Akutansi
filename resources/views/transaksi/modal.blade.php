@@ -296,7 +296,6 @@
             let $target = $(); // empty set
 
             if (preferSelector) {
-                // pecah daftar selector prioritas dan ambil yang pertama ada di DOM
                 const list = preferSelector.split(',').map(s => s.trim()).filter(Boolean);
                 for (const sel of list) {
                     const $el = $(sel);
@@ -308,7 +307,6 @@
             }
 
             if (!$target.length) {
-                // [CHANGES] fallback: party_id -> pemasok_id -> select pertama
                 $target = $('#party_id');
                 if (!$target.length) $target = $('#pemasok_id');
                 if (!$target.length) $target = $('select.form-control').first();
@@ -317,11 +315,28 @@
             if ($target.length) {
                 const text = (data.nama || data.nama_pelanggan || data.nama_pemasok || 'Baru') +
                     (data.kode ? (' (' + data.kode + ')') : '');
-                const val = data.id ?? data.value ?? (data.nama || String(Date.now()));
+
+                // 🔥 WAJIBKAN ID NUMERIK
+                const rawId =
+                    data.id ??
+                    data.id_pelanggan ??
+                    data.pelanggan_id ??
+                    data.value ??
+                    null;
+
+                const val = rawId != null ? String(rawId) : null;
+
+                // Kalau bukan digit semua → jangan dipakai, biar nggak bikin party_id invalid
+                if (!val || !/^\d+$/.test(val)) {
+                    console.warn('appendToSelect: ID tidak valid, data =', data);
+                    return;
+                }
+
                 $target.append(new Option(text, val, true, true));
                 $target.trigger('change');
             }
         }
+
 
 
 
@@ -347,6 +362,7 @@
                         // Normalisasi objek data (id, nama)
                         const d = res.data || {};
                         d.nama = d.nama || d.nama_pelanggan;
+                        d.id = d.id ?? d.id_pelanggan ?? d.pelanggan_id ?? null;
 
                         appendToSelect(d, '#party_id');
 
