@@ -152,18 +152,21 @@ class LaporanKeuanganController extends Controller
             ->map(function ($r) {
                 return [
                     'id'            => $r->id,
+                    'kode_akun'     => $r->kode_akun,
                     'nama_akun'     => $r->nama_akun,
                     'kategori_akun' => $r->kategori_akun,
                     'saldo'         => (float) $r->saldo_berjalan,
                 ];
             });
 
-        // Pisahkan berdasarkan kategori utama
-        $grouped = [
-            'aset'       => $all->filter(fn($r) => str_contains(strtolower($r['kategori_akun']), 'aset'))->values(),
-            'liabilitas' => $all->filter(fn($r) => str_contains(strtolower($r['kategori_akun']), 'liabilitas'))->values(),
-            'ekuitas'    => $all->filter(fn($r) => str_contains(strtolower($r['kategori_akun']), 'ekuitas'))->values(),
-        ];
+       $grouped = [
+                    'aset'       => $all->filter(fn($r) => str_contains(strtolower($r['kategori_akun']), 'aset'))
+                                        ->sortBy('kode_akun')->values(),
+                    'liabilitas' => $all->filter(fn($r) => str_contains(strtolower($r['kategori_akun']), 'liabilitas'))
+                                        ->sortBy('kode_akun')->values(),
+                    'ekuitas'    => $all->filter(fn($r) => str_contains(strtolower($r['kategori_akun']), 'ekuitas'))
+                                        ->sortBy('kode_akun')->values(),
+                ];
 
         $total  = $all->count();
         $offset = ($page - 1) * $perPage;
