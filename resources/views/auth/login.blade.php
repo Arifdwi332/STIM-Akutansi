@@ -8,6 +8,7 @@
 
     {{-- Bootstrap CSS --}}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <style>
         body {
@@ -112,12 +113,24 @@
                         class="form-control auth-input" placeholder="example@gmail.com" autofocus>
                 </div>
 
+
                 {{-- Password --}}
                 <div class="form-group mb-1">
                     <label class="auth-label" for="password">Password</label>
-                    <input type="password" id="password" name="password" class="form-control auth-input"
-                        placeholder="********">
+
+                    <div class="input-group">
+                        <input type="password" id="password" name="password" class="form-control auth-input"
+                            placeholder="********">
+
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="togglePassword">
+                                <i class="bi bi-eye" id="iconPassword"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+
 
                 <div class="auth-footer">
                     <a href="{{ route('mstuser.register') }}" class="auth-link">
@@ -136,5 +149,30 @@
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const input = document.getElementById('password');
+        const btn = document.getElementById('togglePassword');
+        const icon = document.getElementById('iconPassword');
+
+        btn.addEventListener('click', function() {
+            const isHidden = input.type === 'password';
+
+            // ganti tipe input
+            input.type = isHidden ? 'text' : 'password';
+
+            // ganti ikon: mata <-> mata tersilang
+            if (isHidden) {
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        });
+    });
+</script>
+
 
 </html>
