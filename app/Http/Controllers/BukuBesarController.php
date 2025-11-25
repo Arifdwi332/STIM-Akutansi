@@ -709,6 +709,42 @@ public function storetransaksi(Request $request)
         // =========================
         if ($tipe === 'Manual') {
 
+            $akunDebet = DB::table('mst_akun')
+                ->where('id', $akunD)
+                ->where('created_by', $userId)
+                ->lockForUpdate()
+                ->first();
+
+            $akunKredit = DB::table('mst_akun')
+                ->where('id', $akunK)
+                ->where('created_by', $userId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$akunDebet || !$akunKredit) {
+                throw new \RuntimeException('Akun tidak ditemukan.');
+            }
+
+            $normalDebet  = $this->getSaldoNormalAkun($akunDebet->kode_akun,  $akunDebet->nama_akun);
+            $normalKredit = $this->getSaldoNormalAkun($akunKredit->kode_akun, $akunKredit->nama_akun);
+
+            $hitungSaldoBaru = function (float $saldoAwal, string $normal, string $posisi, float $nominal): float {
+                if ($posisi === 'DEBIT') {
+                    // posting di sisi DEBIT
+                    return $normal === 'DEBIT'
+                        ? $saldoAwal + $nominal   
+                        : $saldoAwal - $nominal; 
+                }
+
+                // posting di sisi KREDIT
+                return $normal === 'KREDIT'
+                    ? $saldoAwal + $nominal      
+                    : $saldoAwal - $nominal;  
+            };
+
+            $saldoDebetBaru  = $hitungSaldoBaru((float) $akunDebet->saldo_berjalan,  $normalDebet,  'DEBIT',  $nominal);
+            $saldoKreditBaru = $hitungSaldoBaru((float) $akunKredit->saldo_berjalan, $normalKredit, 'KREDIT', $nominal);
+
           if ($akunK == 1) {
                 $saldoKas = (float) DB::table('mst_akun')
                     ->where('id', 1)
@@ -770,28 +806,31 @@ public function storetransaksi(Request $request)
                     ]);
                 }
             }
-            DB::table('dat_detail_jurnal')->insert([
+                DB::table('dat_detail_jurnal')->insert([
                 [
-                    'id_jurnal'  => $idJurnal,
-                    'id_akun'    => $akunD,
-                    'jml_debit'  => $nominal,
-                    'jml_kredit' => 0,
-                    'tanggal' => $tanggal,
-                    'created_by'    => $userId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'id_jurnal'      => $idJurnal,
+                    'id_akun'        => $akunD,
+                    'jml_debit'      => $nominal,
+                    'jml_kredit'     => 0,
+                    'tanggal'        => $tanggal,
+                    'saldo_berjalan' => $saldoDebetBaru,   // [CHANGES]
+                    'created_by'     => $userId,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
                 ],
                 [
-                    'id_jurnal'  => $idJurnal,
-                    'id_akun'    => $akunK,
-                    'jml_debit'  => 0,
-                    'jml_kredit' => $nominal,
-                    'tanggal' => $tanggal,
-                    'created_by'    => $userId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'id_jurnal'      => $idJurnal,
+                    'id_akun'        => $akunK,
+                    'jml_debit'      => 0,
+                    'jml_kredit'     => $nominal,
+                    'tanggal'        => $tanggal,
+                    'saldo_berjalan' => $saldoKreditBaru,  // [CHANGES]
+                    'created_by'     => $userId,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
                 ],
             ]);
+
 
             // === 3) HEADER TRANSAKSI ===
             $idTransaksi = DB::table('dat_transaksi')->insertGetId([
@@ -950,7 +989,7 @@ public function storetransaksi(Request $request)
                 'Pendapatan Lain-lain (Komisi/Hadiah)'=> [1, 52, 2, 1],
                 'Jual Tanah'                          => [1, 42, 2, 2],
                 'Jual Bangunan'                       => [1, 43, 2, 2],
-                'Jual Kendaraan'                      => [1, 45, 2, 2],
+                'Jual Kendaraan'                      => [1, 44, 2, 2],
                 'Jual Jasa'                           => [1, 17, 2, 1],
             ];
 
