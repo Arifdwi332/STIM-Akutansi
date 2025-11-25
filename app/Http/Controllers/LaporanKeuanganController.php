@@ -105,11 +105,13 @@ class LaporanKeuanganController extends Controller
         })->values();
     }
 
-    // ===== [changes] Urutkan: Pendapatan dulu, lalu nama akun
-    $grouped = $grouped->sortBy([
-        fn($r) => $r->kategori_akun !== 'Pendapatan',
-        'nama_akun'
-    ])->values();
+ // ===== [CHANGES] Urutkan: murni berdasarkan KODE_AKUN (numeric)
+$grouped = $grouped->sortBy(function ($r) {
+    // buang karakter non-angka kalau ada (jaga-jaga kalau kode pakai titik/dll)
+    $kodeNum = (int) preg_replace('/\D/', '', (string) $r->kode_akun);
+    return $kodeNum;
+}, SORT_NUMERIC)->values();
+
 
     // ===== Pagination
     $total  = $grouped->count();
