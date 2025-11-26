@@ -1521,38 +1521,48 @@ public function storetransaksi(Request $request)
             'data' => $items,
         ]);
     }
+
     public function storePemasok(Request $request)
-    {
+{
+    $userId = $this->userId;
 
-        $userId = $this->userId;
-        
-        $rules = [
-            'nama_pemasok' => 'required|string|max:150',
-            'alamat'       => 'nullable|string',
-            'no_hp'        => 'nullable|string|max:30',
-            'email'        => 'nullable|email|max:150',
-            'npwp'         => 'nullable|string|max:50',
-            'nama_barang'  => 'required|string|max:150',
-            'satuan_ukur'  => 'required|string|max:50',
-            'harga_satuan' => 'required|numeric|min:0', 
-            'harga_jual'   => 'required|numeric|min:0',
-            'stok'         => 'required|integer|min:0',
-        ];
+    $rules = [
+        'nama_pemasok' => 'required|string|max:150',
+        'alamat'       => 'nullable|string',
+        'no_hp'        => 'nullable|string|max:30',
+        'email'        => 'nullable|email|max:150',
+        'npwp'         => 'nullable|string|max:50',
+        'nama_barang'  => 'required|string|max:150',
+        'satuan_ukur'  => 'required|string|max:50',
+        'harga_satuan' => 'required|numeric|min:0',
+        'harga_jual'   => 'required|numeric|min:0',
+        'stok'         => 'required|integer|min:0',
+    ];
 
-        $v = Validator::make($request->all(), $rules);
-        if ($v->fails()) {
-            return response()->json([
-                'ok'      => false,
-                'message' => $v->errors()->first(),
-            ], 422);
-        }
+    $v = Validator::make($request->all(), $rules);
+    if ($v->fails()) {
+        return response()->json([
+            'ok'      => false,
+            'message' => $v->errors()->first(),
+        ], 422);
+    }
 
+    DB::beginTransaction(); // [CHANGES] supaya pemasok+barang+jurnal atomic
+    try {
+
+        // ==========================
+        // 1. Generate kode pemasok
+        // ==========================
         $lastPemasok = PemasokModel::where('created_by', $userId)
-        ->orderBy('id_pemasok', 'desc')
-        ->first();
-        $nextNumber = $lastPemasok ? ((int)substr($lastPemasok->kode_pemasok, 3)) + 1 : 1;
+            ->orderBy('id_pemasok', 'desc')
+            ->first();
+
+        $nextNumber  = $lastPemasok ? ((int) substr($lastPemasok->kode_pemasok, 3)) + 1 : 1;
         $kodePemasok = 'SUP' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
+        // ==========================
+        // 2. Simpan pemasok
+        // ==========================
         $pemasok = PemasokModel::create([
             'kode_pemasok' => $kodePemasok,
             'nama_pemasok' => $request->nama_pemasok,
@@ -1560,52 +1570,178 @@ public function storetransaksi(Request $request)
             'no_hp'        => $request->no_hp,
             'email'        => $request->email,
             'npwp'         => $request->npwp,
-            'created_by'   => $userId, 
+            'created_by'   => $userId,
             'saldo_utang'  => 0,
         ]);
 
-       $barang = DatBarangModel::create([
-        'kode_pemasok' => $pemasok->kode_pemasok, 
-        'nama_barang'  => $request->nama_barang,
-        'satuan_ukur'  => $request->satuan_ukur,
-        'harga_satuan' => $request->harga_satuan,
-        'harga_jual'   => $request->harga_jual,
-        'stok_awal'    => (int)$request->stok ?? 0,
-        'stok_akhir'   => (int)$request->stok ?? 0,
-        'created_by'   => $userId, 
-    ]);
+        // ==========================
+        // 3. Simpan barang
+        // ==========================
+        $stok = (int) $request->stok;
 
-      $akunPersediaan = MstAkunModel::where('kode_akun', '1104')
-        ->where('created_by', $userId)
-        ->first();
+        $barang = DatBarangModel::create([
+            'kode_pemasok' => $pemasok->kode_pemasok,
+            'nama_barang'  => $request->nama_barang,
+            'satuan_ukur'  => $request->satuan_ukur,
+            'harga_satuan' => $request->harga_satuan,
+            'harga_jual'   => $request->harga_jual,
+            'stok_awal'    => $stok,
+            'stok_akhir'   => $stok,
+            'created_by'   => $userId,
+        ]);
 
-    $nilaiPersediaan = (float)$request->stok * (float)$request->harga_satuan;
+        // ==========================
+        // 4. Hitung nilai persediaan
+        // ==========================
+        $nilaiPersediaan = (float) $stok * (float) $request->harga_satuan;
 
-    $akunPersediaan = MstAkunModel::where('kode_akun', '1104')->first();
-    if ($akunPersediaan) {
-        $akunPersediaan->saldo_awal += $nilaiPersediaan;
-        $akunPersediaan->saldo_berjalan += $nilaiPersediaan;
-        $akunPersediaan->save();
+        // ==========================
+        // 5. Ambil akun persediaan (1104) & modal (3101)
+        // ==========================
+        $akunPersediaan = MstAkunModel::where('kode_akun', '1104')
+            ->where('created_by', $userId)
+            ->lockForUpdate() // [CHANGES] supaya aman saat update saldo lewat jurnal
+            ->first();
+
+        $akunModal = MstAkunModel::where('kode_akun', '3101')
+            ->where('created_by', $userId)
+            ->lockForUpdate()
+            ->first();
+
+        // ==========================
+        // 6. Buat jurnal kalau ada stok
+        //    Debet: Persediaan (1104)
+        //    Kredit: Modal (3101)
+        // ==========================
+        if ($stok > 0 && $nilaiPersediaan > 0 && $akunPersediaan && $akunModal) {
+            $tglJurnal   = Carbon::today()->format('Y-m-d');
+            $keterangan  = 'Stok awal barang ' . $barang->nama_barang . ' dari pemasok ' . $pemasok->nama_pemasok;
+            $noReferensi = 'SA-' . $pemasok->kode_pemasok; // contoh: SA-SUP001
+
+            // pakai helper insertJurnalSimple yang sudah kamu punya
+            $this->insertJurnalSimple(
+                $tglJurnal,
+                (float) $nilaiPersediaan,
+                $keterangan,
+                (int) $akunPersediaan->id, // Debet Persediaan
+                (int) $akunModal->id,      // Kredit Modal
+                2,                         // jenis_laporan debet  (Neraca)
+                2,                         // jenis_laporan kredit (Neraca)
+                $noReferensi,
+                'STOK_AWAL_PEMASOK',       // modul_sumber
+                true                       // kredit menambah saldo (modal)
+            );
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'ok'   => true,
+            'data' => [
+                'pemasok'          => $pemasok,
+                'barang'           => $barang,
+                'update_akun'      => $akunPersediaan ? true : false,
+                'update_modal'     => $akunModal ? true : false,
+                'nilai_persediaan' => $nilaiPersediaan,
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        DB::rollBack();
+
+        return response()->json([
+            'ok'      => false,
+            'message' => $e->getMessage(),
+        ], 500);
     }
-
-    $akunModal = MstAkunModel::where('kode_akun', '3101')->first();
-    if ($akunModal) {
-        $akunModal->saldo_awal += $nilaiPersediaan;
-        $akunModal->saldo_berjalan += $nilaiPersediaan;
-        $akunModal->save();
-    }
-
-    return response()->json([
-        'ok'   => true,
-        'data' => [
-            'pemasok'           => $pemasok,
-            'barang'            => $barang,
-            'update_akun'       => $akunPersediaan ? true : false,
-            'update_modal'      => $akunModal ? true : false, // ✅ [CHANGES]
-            'nilai_persediaan'  => $nilaiPersediaan,
-        ],
-    ]);
 }
+
+//     public function storePemasok(Request $request)
+//     {
+
+//         $userId = $this->userId;
+        
+//         $rules = [
+//             'nama_pemasok' => 'required|string|max:150',
+//             'alamat'       => 'nullable|string',
+//             'no_hp'        => 'nullable|string|max:30',
+//             'email'        => 'nullable|email|max:150',
+//             'npwp'         => 'nullable|string|max:50',
+//             'nama_barang'  => 'required|string|max:150',
+//             'satuan_ukur'  => 'required|string|max:50',
+//             'harga_satuan' => 'required|numeric|min:0', 
+//             'harga_jual'   => 'required|numeric|min:0',
+//             'stok'         => 'required|integer|min:0',
+//         ];
+
+//         $v = Validator::make($request->all(), $rules);
+//         if ($v->fails()) {
+//             return response()->json([
+//                 'ok'      => false,
+//                 'message' => $v->errors()->first(),
+//             ], 422);
+//         }
+
+//         $lastPemasok = PemasokModel::where('created_by', $userId)
+//         ->orderBy('id_pemasok', 'desc')
+//         ->first();
+//         $nextNumber = $lastPemasok ? ((int)substr($lastPemasok->kode_pemasok, 3)) + 1 : 1;
+//         $kodePemasok = 'SUP' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+//         $pemasok = PemasokModel::create([
+//             'kode_pemasok' => $kodePemasok,
+//             'nama_pemasok' => $request->nama_pemasok,
+//             'alamat'       => $request->alamat,
+//             'no_hp'        => $request->no_hp,
+//             'email'        => $request->email,
+//             'npwp'         => $request->npwp,
+//             'created_by'   => $userId, 
+//             'saldo_utang'  => 0,
+//         ]);
+
+//        $barang = DatBarangModel::create([
+//         'kode_pemasok' => $pemasok->kode_pemasok, 
+//         'nama_barang'  => $request->nama_barang,
+//         'satuan_ukur'  => $request->satuan_ukur,
+//         'harga_satuan' => $request->harga_satuan,
+//         'harga_jual'   => $request->harga_jual,
+//         'stok_awal'    => (int)$request->stok ?? 0,
+//         'stok_akhir'   => (int)$request->stok ?? 0,
+//         'created_by'   => $userId, 
+//     ]);
+
+//       $akunPersediaan = MstAkunModel::where('kode_akun', '1104')
+//         ->where('created_by', $userId)
+//         ->first();
+
+//     $nilaiPersediaan = (float)$request->stok * (float)$request->harga_satuan;
+
+  
+//     if ($akunPersediaan) {
+//         $akunPersediaan->saldo_awal += $nilaiPersediaan;
+//         $akunPersediaan->saldo_berjalan += $nilaiPersediaan;
+//         $akunPersediaan->save();
+//     }
+
+//    $akunModal = MstAkunModel::where('kode_akun', '3101')
+//     ->where('created_by', $userId)
+//     ->first();
+//     if ($akunModal) {
+//         $akunModal->saldo_awal += $nilaiPersediaan;
+//         $akunModal->saldo_berjalan += $nilaiPersediaan;
+//         $akunModal->save();
+//     }
+
+//     return response()->json([
+//         'ok'   => true,
+//         'data' => [
+//             'pemasok'           => $pemasok,
+//             'barang'            => $barang,
+//             'update_akun'       => $akunPersediaan ? true : false,
+//             'update_modal'      => $akunModal ? true : false, // ✅ [CHANGES]
+//             'nilai_persediaan'  => $nilaiPersediaan,
+//         ],
+//     ]);
+// }
     public function resetData(Request $request)
     {        $userId = $this->userId;
 
