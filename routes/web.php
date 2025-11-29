@@ -9,7 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BepController;
 use App\Http\Controllers\BukuUtangController;
 use App\Http\Controllers\AuthController;
-
+use App\Http\Controllers\PPHController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -130,7 +130,10 @@ Route::middleware('umkm.auth')->group(function () {
         Route::get('/datapiutang', [BukuUtangController::class, 'dataPiutang'])->name('buku_piutang.data');
         Route::get('/ref/pelanggan', [BukuUtangController::class, 'refPelanggan'])->name('buku_piutang.ref_pelanggan');
     });
-
+    Route::prefix('pph')->group(function () {
+            Route::get('/', [PPHController::class, 'index'])->name('pph.index');
+            Route::get('/data', [PphController::class, 'data'])->name('pph.data');
+    });
 }); // end middleware auth
 
 // Route::get('/', [DashboardController::class, 'index'])->name('dashboard.index');

@@ -336,6 +336,13 @@
                                 <p>Break Event Point</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route('pph.index') }}"
+                                class="nav-link {{ request()->routeIs('pph.index') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-chart-line"></i>
+                                <p>PPH</p>
+                            </a>
+                        </li>
                         <!-- <li class="nav-item">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon fas fa-user"></i>
