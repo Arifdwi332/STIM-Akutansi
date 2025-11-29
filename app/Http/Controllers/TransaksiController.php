@@ -1088,6 +1088,7 @@ private function insertJurnalSimple(
             $akunKredit => ['debit' => 0,        'kredit' => $nominal],
         ] as $akunId => $val) {
             $bukbes = DB::table('dat_buku_besar')
+                ->where('created_by', $userId)
                 ->where('id_akun', $akunId)
                 ->where('periode', $periode)
                 ->lockForUpdate()
@@ -1100,8 +1101,8 @@ private function insertJurnalSimple(
                         'ttl_debit'   => (float)$bukbes->ttl_debit  + (float)$val['debit'],
                         'ttl_kredit'  => (float)$bukbes->ttl_kredit + (float)$val['kredit'],
                         'saldo_akhir' => (float)$bukbes->saldo_akhir + ((float)$val['debit'] - (float)$val['kredit']),
-                        'created_by'    => $userId,
-                        'created_at'    => $now,
+                        // 'created_by'    => $userId,
+                        // 'created_at'    => $now,
                         'updated_at'  => $now,
                     ]);
             } else {

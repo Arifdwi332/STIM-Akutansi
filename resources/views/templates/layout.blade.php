@@ -333,7 +333,7 @@
                             <a href="{{ route('bep.index') }}"
                                 class="nav-link {{ request()->routeIs('bep.index') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-line"></i>
-                                <p>Rekom Break Event</p>
+                                <p>Break Event Point</p>
                             </a>
                         </li>
                         <!-- <li class="nav-item">

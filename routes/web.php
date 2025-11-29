@@ -9,8 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BepController;
 use App\Http\Controllers\BukuUtangController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\PPHController;
-use Illuminate\Support\Facades\Auth;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -113,6 +112,9 @@ Route::middleware('umkm.auth')->group(function () {
 
     Route::prefix('bep')->name('bep.')->group(function () {
         Route::get('/', [BepController::class, 'index'])->name('index');
+        Route::get('/akun-beban', [BepController::class, 'getAkunBeban'])
+          ->name('akun-beban');
+        Route::get('/penjualan', [BepController::class, 'getPenjualan'])->name('penjualan');
     });
 
     Route::get('/buku_hutang', [BukuUtangController::class, 'index'])->name('buku_hutang.index');
@@ -127,11 +129,6 @@ Route::middleware('umkm.auth')->group(function () {
     Route::prefix('buku_piutang')->group(function () {
         Route::get('/datapiutang', [BukuUtangController::class, 'dataPiutang'])->name('buku_piutang.data');
         Route::get('/ref/pelanggan', [BukuUtangController::class, 'refPelanggan'])->name('buku_piutang.ref_pelanggan');
-    });
-
-    // PPH
-    Route::prefix('pph')->group(function () {
-        Route::get('/', [PPHController::class, 'index'])->name('pph.index');
     });
 
 }); // end middleware auth
