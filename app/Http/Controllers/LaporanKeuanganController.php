@@ -19,12 +19,12 @@ class LaporanKeuanganController extends Controller
     {
         return view('laporan_keuangan.jurnal');
     }
- public function getLabaRugi(Request $request)
+public function getLabaRugi(Request $request)
 {
     $q       = trim($request->input('search', ''));
     $page    = max(1, (int) $request->input('page', 1));
     $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
-    $userId = $this->userId;
+    $userId  = $this->userId;
 
     // ===== Ambil data dari transaksi
     $trxRows = DB::table('dat_detail_transaksi as ddt')
@@ -45,7 +45,6 @@ class LaporanKeuanganController extends Controller
             $w->where(function($x) use ($like) {
                 $x->where('a1.nama_akun', 'like', $like)
                   ->orWhere('ddt.kode_akun', 'like', $like)
-                  // [changes] juga boleh cari lewat a1.kode_akun
                   ->orWhere('a1.kode_akun', 'like', $like);
             });
         })
@@ -70,7 +69,6 @@ class LaporanKeuanganController extends Controller
             $like = '%'.$q.'%';
             $w->where(function($x) use ($like) {
                 $x->where('a2.nama_akun', 'like', $like)
-                  // [changes] support cari kode akun juga
                   ->orWhere('a2.kode_akun', 'like', $like);
             });
         })
@@ -83,7 +81,7 @@ class LaporanKeuanganController extends Controller
         return $r;
     });
 
-    // ===== [changes] Akumulasi per KODE_AKUN (nama akun muncul sekali)
+    // ===== Akumulasi per KODE_AKUN
     $grouped = $all->groupBy('kode_akun')->map(function ($rows, $kode) {
         $first = $rows->first();
         return (object)[
@@ -97,7 +95,7 @@ class LaporanKeuanganController extends Controller
         ];
     })->values();
 
-    // ===== [changes] (opsional) filter lagi setelah akumulasi biar konsisten
+    // ===== Filter lagi setelah akumulasi (kalau ada search)
     if ($q !== '') {
         $grouped = $grouped->filter(function($r) use ($q) {
             return mb_stripos((string)$r->nama_akun, $q) !== false
@@ -105,13 +103,62 @@ class LaporanKeuanganController extends Controller
         })->values();
     }
 
- // ===== [CHANGES] Urutkan: murni berdasarkan KODE_AKUN (numeric)
-$grouped = $grouped->sortBy(function ($r) {
-    // buang karakter non-angka kalau ada (jaga-jaga kalau kode pakai titik/dll)
-    $kodeNum = (int) preg_replace('/\D/', '', (string) $r->kode_akun);
-    return $kodeNum;
-}, SORT_NUMERIC)->values();
+    // ===== Urutkan: murni berdasarkan KODE_AKUN (numeric)
+    $grouped = $grouped->sortBy(function ($r) {
+        $kodeNum = (int) preg_replace('/\D/', '', (string) $r->kode_akun);
+        return $kodeNum;
+    }, SORT_NUMERIC)->values();
 
+    // =========================
+    //  HITUNG LABA BERSIH
+    //  (LOGIKA SAMA DENGAN JS)
+    // =========================
+    $items = $grouped->map(function ($r) {
+        $debet = (float) $r->debet;
+        $kredit = (float) $r->kredit;
+        $kat = mb_strtolower((string) $r->kategori_akun);
+        $nama = mb_strtolower((string) $r->nama_akun);
+        $kode = (string) $r->kode_akun;
+
+        // klasifikasi jenis
+        $jenis = null;
+        $isPendapatan = ($kat === 'pendapatan');
+        $isHpp = ($kode === '5104'
+                  || (int)$kode === 5104
+                  || preg_match('/hpp|harga pokok/i', $nama));
+        $isPenjualan = $isPendapatan && (
+            preg_match('/(penjualan|sales)/i', $nama) ||
+            preg_match('/^(40|41)\d{2,}$/', $kode)
+        );
+
+        if ($isPendapatan) {
+            $jenis = $isPenjualan ? 'penjualan' : 'pendapatan_lain';
+        } else {
+            $jenis = $isHpp ? 'hpp' : 'beban';
+        }
+
+        // nilai basis (positif untuk tampilan)
+        $nilai = ($jenis === 'penjualan' || $jenis === 'pendapatan_lain')
+            ? ($kredit - $debet)   // pendapatan
+            : ($debet - $kredit);  // HPP / beban
+
+        return (object)[
+            'nama_akun'     => $r->nama_akun,
+            'kategori_akun' => $r->kategori_akun,
+            'kode_akun'     => $r->kode_akun,
+            'jenis'         => $jenis,
+            'nilai'         => max(0, $nilai),
+            'debet'         => $debet,
+            'kredit'        => $kredit,
+        ];
+    });
+
+    $totalPenjualan   = $items->where('jenis', 'penjualan')->sum('nilai');
+    $totalHpp         = $items->where('jenis', 'hpp')->sum('nilai');
+    $totalPendLain    = $items->where('jenis', 'pendapatan_lain')->sum('nilai');
+    $totalPendNet     = $totalPenjualan + $totalPendLain - $totalHpp;
+    $totalBeban       = $items->where('jenis', 'beban')->sum('nilai');
+    $labaBersih       = $totalPendNet - $totalBeban;
 
     // ===== Pagination
     $total  = $grouped->count();
@@ -120,10 +167,18 @@ $grouped = $grouped->sortBy(function ($r) {
 
     // ===== Response
     return response()->json([
-        'ok'    => true,
-        'data'  => $rows,
-        'total' => $total,
-        'page'  => $page,
+        'ok'              => true,
+        'data'            => $rows,
+        'total'           => $total,
+        'page'            => $page,
+
+        // tambahan buat dashboard
+        'total_penjualan'    => $totalPenjualan,
+        'total_hpp'          => $totalHpp,
+        'total_pend_lain'    => $totalPendLain,
+        'total_pendapatan'   => $totalPendNet,
+        'total_beban'        => $totalBeban,
+        'laba_bersih'        => $labaBersih,
     ]);
 }
 

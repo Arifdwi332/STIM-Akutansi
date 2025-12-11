@@ -367,18 +367,39 @@
         <div class="bb-panel mt-3">
             <div class="bb-head">Penjualan / Pembelian</div>
             <div class="bb-body">
+                @php
+                    $tab = request('tab', 'transaksi');
+                @endphp
+
                 <ul class="nav nav-pills mb-3" id="invTab" role="tablist">
-                    <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#tabTransaksi">Data
-                            Transaksi</a></li>
-                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabInventaris">Data Barang</a>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $tab === 'transaksi' ? 'active' : '' }}" data-toggle="tab"
+                            href="#tabTransaksi">
+                            Data Transaksi
+                        </a>
                     </li>
-                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabPemasok">Data Pemasok</a>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $tab === 'barang' ? 'active' : '' }}" data-toggle="tab"
+                            href="#tabInventaris">
+                            Data Barang
+                        </a>
                     </li>
-                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabPelanggan">Data Pelanggan</a>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $tab === 'pemasok' ? 'active' : '' }}" data-toggle="tab"
+                            href="#tabPemasok">
+                            Data Pemasok
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $tab === 'pelanggan' ? 'active' : '' }}" data-toggle="tab"
+                            href="#tabPelanggan">
+                            Data Pelanggan
+                        </a>
                     </li>
                 </ul>
+
                 <div class="tab-content">
-                    <div class="tab-pane fade show active" id="tabTransaksi">
+                    <div class="tab-pane fade {{ $tab === 'transaksi' ? 'show active' : '' }}" id="tabTransaksi">
                         {{-- [CHANGES][HTML] Filter Transaksi --}}
                         <div class="form-row align-items-end mb-3" id="filterTransaksi">
                             <div class="form-group fx-200">
@@ -445,7 +466,7 @@
                         </div>
                     </div>
 
-                    <div class="tab-pane fade" id="tabInventaris">
+                    <div class="tab-pane fade {{ $tab === 'barang' ? 'show active' : '' }}" id="tabInventaris">
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered" id="tblInventaris" style="width:100%">
                                 <thead>
@@ -469,7 +490,7 @@
                             </table>
                         </div>
                     </div>
-                    <div class="tab-pane fade" id="tabPemasok">
+                    <div class="tab-pane fade {{ $tab === 'pemasok' ? 'show active' : '' }}" id="tabPemasok">
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered" id="tblPemasok" style="width:100%">
                                 <thead>
@@ -485,7 +506,7 @@
                             </table>
                         </div>
                     </div>
-                    <div class="tab-pane fade" id="tabPelanggan">
+                    <div class="tab-pane fade {{ $tab === 'pelanggan' ? 'show active' : '' }}" id="tabPelanggan">
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered" id="tblPelanggan" style="width:100%">
                                 <thead>

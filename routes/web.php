@@ -46,6 +46,8 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('umkm.auth')->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard.index');
+     Route::get('/laba_rugi_data', [DashboardController::class, 'getLabaRugi'])
+    ->name('laporan.labaRugi');
 
     Route::get('/buku_besar', [BukuBesarController::class, 'index'])->name('buku_besar.index');
     Route::get('/buku_besar/mst_akun', [BukuBesarController::class, 'listMstAkun'])->name('buku_besar.mst_akun');
@@ -101,6 +103,8 @@ Route::middleware('umkm.auth')->group(function () {
         Route::get('/get_neraca', [LaporanKeuanganController::class, 'getNeraca'])->name('get_neraca');
         Route::get('/bukbes', [LaporanKeuanganController::class, 'bukbes'])->name('bukbes');
         Route::get('/jurnal', [LaporanKeuanganController::class, 'jurnal'])->name('jurnal');
+
+       
     });
 
     Route::prefix('faktur')->name('faktur.')->group(function () {
